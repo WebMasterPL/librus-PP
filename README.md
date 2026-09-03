@@ -88,9 +88,9 @@ na telefonie w SideStore. Żeby użyć własnego repo: zmień URL-e w `apps.json
   przeglądarkę na `portal.librus.pl`, odczekaj chwilę i spróbuj ponownie w apce.
 - **„Portal nie zwrócił żadnego konta Synergia"** — konto musi być połączone na
   `portal.librus.pl` (*Twoje konta*).
-- **Wiadomości** — aplikacja próbuje dwóch dróg (stary interfejs Synergii oraz
-  `wiadomosci.librus.pl`); różne szkoły mają różne. Jeśli obie zawiodą, dołącz do zgłoszenia
-  linię „Wiadomości" z Diagnostyki.
+- **Wiadomości** — aplikacja czyta stronę `synergia.librus.pl/wiadomosci` (starszy, ale
+  wspólny dla wszystkich szkół interfejs). Jeśli Twoja szkoła ma inny układ skrzynki i coś
+  nie działa, dołącz do zgłoszenia linię „Wiadomości" z Diagnostyki — dodam obsługę.
 - **Pusty plan lekcji** — sprawdź w Librusie, czy plan klasy jest publiczny.
 - **Widżet nie widzi danych** — otwórz raz aplikację i odśwież plan (SideStore przy sideloadzie
   przepisuje identyfikator App Group; aplikacja to wykrywa, ale potrzebuje jednego odświeżenia).
