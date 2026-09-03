@@ -88,9 +88,20 @@ struct SettingsView: View {
                 LabeledContent("Wersja", value: version)
                 LabeledContent("Widżet (App Group)", value: SharedStore.status)
                     .font(.caption)
-                Text("Nieoficjalny klient Librus Synergia. Do użytku własnego. Łączy się bezpośrednio z api.librus.pl.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Link(destination: URL(string: "https://github.com/WebMasterPL/librus-PP/issues")!) {
+                    Label("Zgłoś problem", systemImage: "ladybug")
+                }
+                Link(destination: URL(string: "https://github.com/WebMasterPL/librus-PP")!) {
+                    Label("Kod źródłowy (GitHub)", systemImage: "chevron.left.forwardslash.chevron.right")
+                }
+                Text("""
+                Nieoficjalny klient Librus Synergia — bez związku z firmą Librus. Do użytku \
+                edukacyjnego / własnego, na własną odpowiedzialność. Łączy się wyłącznie z \
+                *.librus.pl; dane logowania trzymane są tylko w Keychainie tego urządzenia. \
+                Brak analityki i serwera pośredniczącego.
+                """)
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
         }
         .listStyle(.insetGrouped)
