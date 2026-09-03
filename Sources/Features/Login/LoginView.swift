@@ -65,10 +65,15 @@ struct LoginView: View {
             .controlSize(.large)
             .disabled(login.isEmpty || password.isEmpty || app.isLoggingIn)
 
-            Text("Te same dane co w oficjalnej apce Librus / na konto.librus.pl. Sam login szkolny (1234567u) nie zadziała. Dane trzymane wyłącznie w Keychainie tego urządzenia.")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
+            VStack(spacing: Theme.Space.sm) {
+                Text("Zaloguj się **e‑mailem Konta LIBRUS** — tym samym co w oficjalnej apce Librus / na konto.librus.pl. Sam login szkolny (`1234567u`) tu nie zadziała.")
+                Text("Nie masz Konta LIBRUS? Załóż je na konto.librus.pl i połącz z Synergią.")
+                Text("Nieoficjalny klient, bez związku z firmą Librus. Dane logowania trzymane są wyłącznie w Keychainie tego urządzenia.")
+                    .foregroundStyle(.tertiary)
+            }
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.center)
 
             Spacer()
             Spacer()
