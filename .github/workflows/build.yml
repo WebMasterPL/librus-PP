@@ -1,0 +1,164 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-14
+    timeout-minutes: 30
+    env:
+      SCHEME: MojLibrus
+      APP_NAME: MojLibrus
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Install tools
+        run: brew install xcodegen xcbeautify
+
+      - name: Compute version
+        id: ver
+        run: |
+          BUILD=$(( GITHUB_RUN_NUMBER + 1000 ))
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+            IS_TAG=1
+          else
+            VERSION="0.0.${BUILD}"
+            IS_TAG=0
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "build=$BUILD" >> "$GITHUB_OUTPUT"
+          echo "is_tag=$IS_TAG" >> "$GITHUB_OUTPUT"
+          echo "Building $VERSION (build $BUILD)"
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Pick an iOS Simulator
+        id: sim
+        run: |
+          UDID=$(xcrun simctl list devices available -j | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; print(next(x['udid'] for k in sorted(d) if 'iOS' in k for x in d[k] if x['name'].startswith('iPhone')))")
+          if [ -z "$UDID" ]; then echo '::error::no iOS simulator found'; exit 1; fi
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+          echo "Using simulator $UDID"
+
+      - name: Run unit tests
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project "$APP_NAME.xcodeproj" \
+            -scheme "$SCHEME" \
+            -destination "id=${{ steps.sim.outputs.udid }}" \
+            -derivedDataPath build-test \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcbeautify --renderer github-actions
+
+      - name: Build (unsigned, device)
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project "$APP_NAME.xcodeproj" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            MARKETING_VERSION=${{ steps.ver.outputs.version }} \
+            CURRENT_PROJECT_VERSION=${{ steps.ver.outputs.build }} \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            clean build \
+            | xcbeautify --renderer github-actions
+
+      - name: Package unsigned IPA
+        run: |
+          APP_PATH="build/Build/Products/Release-iphoneos/$APP_NAME.app"
+          if [ ! -d "$APP_PATH" ]; then echo "::error::$APP_PATH not found"; exit 1; fi
+          echo "Built version: $(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$APP_PATH/Info.plist")"
+          rm -rf Payload "$APP_NAME.ipa"
+          mkdir Payload
+          cp -R "$APP_PATH" Payload/
+          zip -qr "$APP_NAME.ipa" Payload
+          mkdir -p dist
+          mv "$APP_NAME.ipa" dist/
+          ls -lh dist
+
+      - name: Refresh SideStore source (apps.json)
+        run: |
+          SIZE=$(stat -f%z "dist/$APP_NAME.ipa")
+          DATE=$(date -u +%Y-%m-%d)
+          DL="https://github.com/${{ github.repository }}/releases/latest/download/$APP_NAME.ipa"
+          python3 - "${{ steps.ver.outputs.version }}" "${{ steps.ver.outputs.build }}" "$SIZE" "$DATE" "$DL" "${{ github.repository }}" <<'PY'
+          import json, sys, pathlib
+          version, build, size, date, url, repo = sys.argv[1:7]
+          p = pathlib.Path("apps.json")
+          data = json.loads(p.read_text(encoding="utf-8"))
+          data["sourceURL"] = f"https://github.com/{repo}/releases/latest/download/apps.json"
+          app = data["apps"][0]
+          app["iconURL"] = f"https://raw.githubusercontent.com/{repo}/main/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png"
+          entry = {"version": version, "buildVersion": build, "date": date,
+                   "localizedDescription": f"Wersja {version} (build {build}).",
+                   "downloadURL": url, "size": int(size), "minOSVersion": "17.0"}
+          app["version"] = version
+          app["versionDate"] = date
+          app["versionDescription"] = entry["localizedDescription"]
+          app["downloadURL"] = url
+          app["size"] = int(size)
+          kept = [v for v in app.get("versions", []) if v.get("version") != version]
+          app["versions"] = [entry] + kept
+          p.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+          pathlib.Path("dist/apps.json").write_text(
+              json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+          print("apps.json ->", version, "build", build, size, "bytes")
+          PY
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: MojLibrus-ipa
+          path: |
+            dist/MojLibrus.ipa
+            dist/apps.json
+          if-no-files-found: error
+
+      - name: Publish Release (tags only)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/MojLibrus.ipa
+            dist/apps.json
+          generate_release_notes: true
+
+      - name: Commit updated apps.json to main (tags only)
+        if: steps.ver.outputs.is_tag == '1'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout main
+          git pull --ff-only origin main || true
+          cp dist/apps.json apps.json
+          if git diff --quiet -- apps.json; then
+            echo "apps.json unchanged"
+          else
+            git add apps.json
+            git commit -m "ci: apps.json -> ${{ steps.ver.outputs.version }} [skip ci]"
+            git push origin main
+          fi

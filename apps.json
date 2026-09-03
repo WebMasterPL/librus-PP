@@ -1,0 +1,217 @@
+{
+  "name": "Mój Librus (prywatne)",
+  "identifier": "eu.mojlibrus.app.source",
+  "sourceURL": "https://github.com/WebMasterPL/moj-librus/releases/latest/download/apps.json",
+  "apps": [
+    {
+      "name": "Mój Librus",
+      "bundleIdentifier": "eu.mojlibrus.app",
+      "developerName": "olekd",
+      "subtitle": "Nieoficjalny klient Librus Synergia",
+      "localizedDescription": "Prywatna aplikacja iOS do Librus Synergia: oceny (z kalkulatorem średniej), plan lekcji z zastępstwami i zmianami sal, frekwencja, terminarz, uwagi, ogłoszenia, wiadomości, rozkład dzwonków i widżet planu lekcji. Tylko do użytku własnego.",
+      "iconURL": "https://raw.githubusercontent.com/WebMasterPL/moj-librus/main/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png",
+      "tintColor": "0B818B",
+      "category": "education",
+      "version": "1.6.14",
+      "versionDate": "2026-09-03",
+      "versionDescription": "Wersja 1.6.14 (build 1071).",
+      "downloadURL": "https://github.com/WebMasterPL/moj-librus/releases/latest/download/MojLibrus.ipa",
+      "size": 1081295,
+      "versions": [
+        {
+          "version": "1.6.14",
+          "buildVersion": "1071",
+          "date": "2026-09-03",
+          "localizedDescription": "Wersja 1.6.14 (build 1071).",
+          "downloadURL": "https://github.com/WebMasterPL/moj-librus/releases/latest/download/MojLibrus.ipa",
+          "size": 1081295,
+          "minOSVersion": "17.0"
+        },
+        {
+          "version": "1.6.12",
+          "buildVersion": "1064",
+          "date": "2026-09-03",
+          "localizedDescription": "Wersja 1.6.12 (build 1064).",
+          "downloadURL": "https://github.com/WebMasterPL/moj-librus/releases/latest/download/MojLibrus.ipa",
+          "size": 1089695,
+          "minOSVersion": "17.0"
+        },
+        {
+          "version": "1.6.11",
+          "buildVersion": "1062",
+          "date": "2026-09-03",
+          "localizedDescription": "Wersja 1.6.11 (build 1062).",
+          "downloadURL": "https://github.com/WebMasterPL/moj-librus/releases/latest/download/MojLibrus.ipa",
+          "size": 1048764,
+          "minOSVersion": "17.0"
+        },
+        {
+          "version": "1.6.10",
+          "buildVersion": "1060",
+          "date": "2026-09-03",
+          "localizedDescription": "Wersja 1.6.10 (build 1060).",
+          "downloadURL": "https://github.com/WebMasterPL/moj-librus/releases/latest/download/MojLibrus.ipa",
+          "size": 1043292,
+          "minOSVersion": "17.0"
+        },
+        {
+          "version": "1.6.9",
+          "buildVersion": "1058",
+          "date": "2026-09-03",
+          "localizedDescription": "Wersja 1.6.9 (build 1058).",
+          "downloadURL": "https://github.com/WebMasterPL/moj-librus/releases/latest/download/MojLibrus.ipa",
+          "size": 1036620,
+          "minOSVersion": "17.0"
+        },
+        {
+          "version": "1.6.8",
+          "buildVersion": "1056",
+          "date": "2026-09-03",
+          "localizedDescription": "Wersja 1.6.8 (build 1056).",
+          "downloadURL": "https://github.com/WebMasterPL/moj-librus/releases/latest/download/MojLibrus.ipa",
+          "size": 1030494,
+          "minOSVersion": "17.0"
+        },
+        {
+          "version": "1.6.7",
+          "buildVersion": "1054",
+          "date": "2026-09-03",
+          "localizedDescription": "Wersja 1.6.7 (build 1054).",
+          "downloadURL": "https://github.com/WebMasterPL/moj-librus/releases/latest/download/MojLibrus.ipa",
+          "size": 987607,
+          "minOSVersion": "17.0"
+        },
+        {
+          "version": "1.6.6",
+          "buildVersion": "1052",
+          "date": "2026-09-03",
+          "localizedDescription": "Wersja 1.6.6 (build 1052).",
+          "downloadURL": "https://github.com/WebMasterPL/moj-librus/releases/latest/download/MojLibrus.ipa",
+          "size": 1012499,
+          "minOSVersion": "17.0"
+        },
+        {
+          "version": "1.6.5",
+          "buildVersion": "1050",
+          "date": "2026-09-03",
+          "localizedDescription": "Wersja 1.6.5 (build 1050).",
+          "downloadURL": "https://github.com/WebMasterPL/moj-librus/releases/latest/download/MojLibrus.ipa",
+          "size": 1017631,
+          "minOSVersion": "17.0"
+        },
+        {
+          "version": "1.6.4",
+          "buildVersion": "1048",
+          "date": "2026-09-03",
+          "localizedDescription": "Wersja 1.6.4 (build 1048).",
+          "downloadURL": "https://github.com/WebMasterPL/moj-librus/releases/latest/download/MojLibrus.ipa",
+          "size": 1011609,
+          "minOSVersion": "17.0"
+        },
+        {
+          "version": "1.6.3",
+          "buildVersion": "1046",
+          "date": "2026-09-03",
+          "localizedDescription": "Wersja 1.6.3 (build 1046).",
+          "downloadURL": "https://github.com/WebMasterPL/moj-librus/releases/latest/download/MojLibrus.ipa",
+          "size": 986483,
+          "minOSVersion": "17.0"
+        },
+        {
+          "version": "1.6.2",
+          "buildVersion": "1044",
+          "date": "2026-09-03",
+          "localizedDescription": "Wersja 1.6.2 (build 1044).",
+          "downloadURL": "https://github.com/WebMasterPL/moj-librus/releases/latest/download/MojLibrus.ipa",
+          "size": 979780,
+          "minOSVersion": "17.0"
+        },
+        {
+          "version": "1.6.1",
+          "buildVersion": "1042",
+          "date": "2026-09-03",
+          "localizedDescription": "Wersja 1.6.1 (build 1042).",
+          "downloadURL": "https://github.com/WebMasterPL/moj-librus/releases/latest/download/MojLibrus.ipa",
+          "size": 973440,
+          "minOSVersion": "17.0"
+        },
+        {
+          "version": "1.6.0",
+          "buildVersion": "1040",
+          "date": "2026-09-02",
+          "localizedDescription": "Wersja 1.6.0 (build 1040).",
+          "downloadURL": "https://github.com/WebMasterPL/moj-librus/releases/latest/download/MojLibrus.ipa",
+          "size": 954632,
+          "minOSVersion": "17.0"
+        },
+        {
+          "version": "1.5.2",
+          "buildVersion": "1036",
+          "date": "2026-09-02",
+          "localizedDescription": "Wersja 1.5.2 (build 1036).",
+          "downloadURL": "https://github.com/WebMasterPL/moj-librus/releases/latest/download/MojLibrus.ipa",
+          "size": 852383,
+          "minOSVersion": "17.0"
+        },
+        {
+          "version": "1.5.1",
+          "buildVersion": "1033",
+          "date": "2026-09-02",
+          "localizedDescription": "Wersja 1.5.1 (build 1033).",
+          "downloadURL": "https://github.com/WebMasterPL/moj-librus/releases/latest/download/MojLibrus.ipa",
+          "size": 842779,
+          "minOSVersion": "17.0"
+        },
+        {
+          "version": "1.5.0",
+          "buildVersion": "1031",
+          "date": "2026-09-02",
+          "localizedDescription": "Wersja 1.5.0 (build 1031).",
+          "downloadURL": "https://github.com/WebMasterPL/moj-librus/releases/latest/download/MojLibrus.ipa",
+          "size": 837440,
+          "minOSVersion": "17.0"
+        },
+        {
+          "version": "1.4.3",
+          "buildVersion": "1027",
+          "date": "2026-09-02",
+          "localizedDescription": "Wersja 1.4.3 (build 1027).",
+          "downloadURL": "https://github.com/WebMasterPL/moj-librus/releases/latest/download/MojLibrus.ipa",
+          "size": 761971,
+          "minOSVersion": "17.0"
+        },
+        {
+          "version": "1.4.2",
+          "buildVersion": "1025",
+          "date": "2026-09-02",
+          "localizedDescription": "Wersja 1.4.2 (build 1025).",
+          "downloadURL": "https://github.com/WebMasterPL/moj-librus/releases/latest/download/MojLibrus.ipa",
+          "size": 762219,
+          "minOSVersion": "17.0"
+        },
+        {
+          "version": "1.4.1",
+          "buildVersion": "1023",
+          "date": "2026-09-02",
+          "localizedDescription": "Wersja 1.4.1 (build 1023).",
+          "downloadURL": "https://github.com/WebMasterPL/moj-librus/releases/latest/download/MojLibrus.ipa",
+          "size": 760334,
+          "minOSVersion": "17.0"
+        },
+        {
+          "version": "1.0.0",
+          "buildVersion": "1",
+          "date": "2026-09-01",
+          "localizedDescription": "Pierwsza wersja.",
+          "downloadURL": "https://github.com/WebMasterPL/moj-librus/releases/latest/download/MojLibrus.ipa",
+          "size": 0
+        }
+      ],
+      "appPermissions": {
+        "entitlements": [],
+        "privacy": {}
+      }
+    }
+  ],
+  "news": []
+}
