@@ -29,7 +29,6 @@ przez **SideStore / AltStore** darmowym Apple ID.
 | Uwagi | `.../2.0/Notes` |
 | Rozkład dzwonków (godziny lekcji) | `.../2.0/Schools` (`LessonsRange`) |
 | Wiadomości — **odbierane i wysłane**, wysyłanie z wyborem odbiorców, status odczytania | scraping `synergia.librus.pl/wiadomosci` |
-| **Widżet** planu lekcji (zastępstwa, odwołania, zmiany sal) — small/medium/large | App Group |
 | Logowanie | `portal.librus.pl` OAuth → `api/v3/SynergiaAccounts` → Bearer per konto |
 | Ustawienia → **Diagnostyka połączenia** — test każdego endpointu + kopiuj raport | — |
 | Powiadomienia (osobno: oceny / zmiany w planie / wiadomości), *eksperymentalne* | `BGAppRefreshTask` |
@@ -92,8 +91,14 @@ na telefonie w SideStore. Żeby użyć własnego repo: zmień URL-e w `apps.json
   wspólny dla wszystkich szkół interfejs). Jeśli Twoja szkoła ma inny układ skrzynki i coś
   nie działa, dołącz do zgłoszenia linię „Wiadomości" z Diagnostyki — dodam obsługę.
 - **Pusty plan lekcji** — sprawdź w Librusie, czy plan klasy jest publiczny.
-- **Widżet nie widzi danych** — otwórz raz aplikację i odśwież plan (SideStore przy sideloadzie
-  przepisuje identyfikator App Group; aplikacja to wykrywa, ale potrzebuje jednego odświeżenia).
+
+## Widżet planu lekcji
+
+Kod widżetu jest w repo (`Sources/Widget/`, `Sources/Shared/`), ale **wydawany build go
+nie zawiera** — darmowe konto Apple ID nie dostaje profilu provisioning dla rozszerzenia
+z App Group, przez co sideload padał (`0xe8008015`). Żeby zbudować z widżetem: przywróć
+target `MojLibrusWidget` i `CODE_SIGN_ENTITLEMENTS` w `project.yml` i podpisz kontem
+z płatnego programu deweloperskiego.
 
 ## Uwaga prawna
 
@@ -113,7 +118,7 @@ Sources/
   Store/     DataRepository (@Observable, łączenie po Id, cache), GradeMath, Cache
   Messages/  MessagesClient (actor: sesja Synergia → scraping wiadomości)
   Features/  ekrany SwiftUI
-  Widget/ + Shared/   rozszerzenie widżetu + współdzielony store
+  Widget/ + Shared/   rozszerzenie widżetu (nie budowane) + współdzielony store
 Tests/       dekodowanie próbek JSON + testy średnich
 ```
 

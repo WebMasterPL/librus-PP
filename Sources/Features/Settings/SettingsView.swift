@@ -99,8 +99,6 @@ struct SettingsView: View {
 
             Section("O aplikacji") {
                 LabeledContent("Wersja", value: version)
-                LabeledContent("Widżet (App Group)", value: SharedStore.status)
-                    .font(.caption)
                 Link(destination: URL(string: "https://github.com/WebMasterPL/librus-PP/issues")!) {
                     Label("Zgłoś problem", systemImage: "ladybug")
                 }

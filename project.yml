@@ -24,6 +24,10 @@ targets:
     type: application
     platform: iOS
     sources:
+      # The widget extension is intentionally not built: a free Apple ID can't be
+      # issued a provisioning profile for an app-extension + App Group, which made
+      # sideloading fail (0xe8008015). The code stays in the repo — re-add the
+      # MojLibrusWidget target + CODE_SIGN_ENTITLEMENTS to ship it with a paid team.
       - path: Sources
         excludes:
           - "Widget"
@@ -34,36 +38,17 @@ targets:
           - "Widget"
           - "Widget/**"
           - "*.entitlements"
-    dependencies:
-      - target: MojLibrusWidget
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: eu.mojlibrus.app
         PRODUCT_NAME: MojLibrus
         INFOPLIST_FILE: Resources/Info.plist
-        CODE_SIGN_ENTITLEMENTS: Resources/MojLibrus.entitlements
         TARGETED_DEVICE_FAMILY: "1"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         GENERATE_INFOPLIST_FILE: "NO"
         SWIFT_EMIT_LOC_STRINGS: "YES"
         CLANG_ENABLE_MODULES: "YES"
-
-  MojLibrusWidget:
-    type: app-extension
-    platform: iOS
-    sources:
-      - path: Sources/Widget
-      - path: Sources/Shared
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: eu.mojlibrus.app.widget
-        PRODUCT_NAME: MojLibrusWidget
-        INFOPLIST_FILE: Resources/Widget/Info.plist
-        CODE_SIGN_ENTITLEMENTS: Resources/MojLibrusWidget.entitlements
-        GENERATE_INFOPLIST_FILE: "NO"
-        TARGETED_DEVICE_FAMILY: "1"
-        SWIFT_EMIT_LOC_STRINGS: "YES"
 
   MojLibrusTests:
     type: bundle.unit-test
@@ -84,7 +69,6 @@ schemes:
     build:
       targets:
         MojLibrus: all
-        MojLibrusWidget: all
         MojLibrusTests: [test]
     test:
       targets:
