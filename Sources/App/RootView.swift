@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RootView: View {
     @Environment(AppState.self) private var app
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         ZStack {
@@ -25,6 +26,12 @@ struct RootView: View {
         .animation(Theme.Motion.emphasized, value: app.phase)
         .task {
             if case .loading = app.phase { await app.bootstrap() }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            // Returning to the foreground (incl. from the app switcher) — refresh.
+            guard phase == .active, case .loggedIn = app.phase,
+                  let repo = app.repository else { return }
+            Task { await repo.foregroundRefresh() }
         }
     }
 }

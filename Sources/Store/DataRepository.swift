@@ -51,6 +51,9 @@ final class DataRepository {
     /// Classroom id -> room name/number. The timetable often gives only `Classroom.Id`.
     @ObservationIgnored private var classroomNameByID: [Int: String] = [:]
 
+    /// Last successful inbox scrape — gates `loadMessagesIfStale`.
+    @ObservationIgnored private var messagesLastSync: Date?
+
     /// Locally-tracked "read" state (Librus has no student-side write for these).
     private var readAnnouncementIDs: Set<String> = []
     private var readMessageIDs: Set<Int> = []
@@ -189,9 +192,53 @@ final class DataRepository {
     func refreshCore() async {
         guard !isRefreshing else { return }
         isRefreshing = true
-        lastError = nil
         defer { isRefreshing = false }
+        do {
+            try await withOneRetry { try await self.performCoreFetch() }
+            lastError = nil
+        } catch {
+            handle(error, into: \.lastError)
+        }
+    }
 
+    /// Refresh only when the last successful sync is older than `maxAge`. Used when
+    /// entering a screen / returning to the foreground so tapping around doesn't
+    /// re-hit every endpoint.
+    func refreshCoreIfStale(maxAge: TimeInterval = 90) async {
+        if let last = lastSync, Date().timeIntervalSince(last) < maxAge { return }
+        await refreshCore()
+    }
+
+    /// App came back to the foreground — one stale-gated pass over everything.
+    func foregroundRefresh() async {
+        guard !isRefreshing else { return } // a sync (e.g. from launch) is already running
+        let stale = lastSync.map { Date().timeIntervalSince($0) >= 90 } ?? true
+        guard stale else { return }
+        await refreshCore()
+        await loadTimetable(weekStart: LibrusDate.weekStart())
+        await loadMessagesIfStale()
+    }
+
+    /// One automatic retry after a short pause for transient failures. Auth-dead
+    /// errors are not retried — they need a re-login, not another attempt.
+    private func withOneRetry(_ op: () async throws -> Void) async throws {
+        do { try await op() }
+        catch {
+            guard Self.isRetryable(error) else { throw error }
+            try? await Task.sleep(for: .seconds(2))
+            try await op()
+        }
+    }
+
+    private static func isRetryable(_ error: Error) -> Bool {
+        guard let api = error as? APIError else { return true }
+        switch api {
+        case .tokenExpired, .invalidCredentials, .captchaNeeded: return false
+        default: return true
+        }
+    }
+
+    private func performCoreFetch() async throws {
         do {
             // Dictionaries + primary data, fetched concurrently.
             let api = self.api
@@ -322,7 +369,8 @@ final class DataRepository {
                 await loadTimetable(weekStart: LibrusDate.weekStart())
             }
         } catch {
-            handle(error, into: \.lastError)
+            // Nothing was persisted — surface it to the retry/handling in refreshCore().
+            throw error
         }
     }
 
@@ -330,8 +378,15 @@ final class DataRepository {
     private func handle(_ error: Error, into keyPath: ReferenceWritableKeyPath<DataRepository, String?>) {
         let text = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         self[keyPath: keyPath] = text
-        if let apiError = error as? APIError, case .tokenExpired = apiError {
-            onSessionExpired?()
+        // A silent re-login that comes back with `.invalidCredentials` means the
+        // stored password no longer works (user changed it) — the session is just
+        // as dead as an expired token, and retrying it on every refresh risks a
+        // Librus account lockout. Both cases: hand off to a clean re-login.
+        if let apiError = error as? APIError {
+            switch apiError {
+            case .tokenExpired, .invalidCredentials: onSessionExpired?()
+            default: break
+            }
         }
     }
 
@@ -340,39 +395,40 @@ final class DataRepository {
     func loadTimetable(weekStart: Date) async {
         let key = LibrusDate.ymdString(weekStart)
         do {
-            let raw = try await api.timetable(weekStart: weekStart)
-            let days: [TimetableDay] = raw.keys.sorted().compactMap { dateStr in
-                guard let date = LibrusDate.fromYMD(dateStr) else { return nil }
-                let slots = raw[dateStr] ?? []
-                let entries: [TimetableEntry] = slots.flatMap { $0 }.compactMap(mapLesson)
-                    .sorted { $0.lessonNo < $1.lessonNo }
-                return TimetableDay(date: date, entries: entries)
-            }
-            timetableWeeks[key] = days
+            try await withOneRetry { try await self.fetchTimetable(weekStart: weekStart, key: key) }
             timetableError = nil
-            if !Seen.timetableChanges.hasBaseline {
-                Seen.timetableChanges.establishBaseline(upcomingChangeSignatures())
-            }
-            saveCache()
-            SharedStore.publishTimetable(upcomingDays())
-            WidgetRefresher.reload()
         } catch {
             // Keep timetable failures out of the app-wide error banner.
             handle(error, into: \.timetableError)
         }
     }
 
+    private func fetchTimetable(weekStart: Date, key: String) async throws {
+        let raw = try await api.timetable(weekStart: weekStart)
+        let days: [TimetableDay] = raw.keys.sorted().compactMap { dateStr in
+            guard let date = LibrusDate.fromYMD(dateStr) else { return nil }
+            let slots = raw[dateStr] ?? []
+            let entries: [TimetableEntry] = slots.flatMap { $0 }.compactMap(mapLesson)
+                .sorted { $0.lessonNo < $1.lessonNo }
+            return TimetableDay(date: date, entries: entries)
+        }
+        timetableWeeks[key] = days
+        if !Seen.timetableChanges.hasBaseline {
+            Seen.timetableChanges.establishBaseline(upcomingChangeSignatures())
+        }
+        saveCache()
+        SharedStore.publishTimetable(upcomingDays())
+        WidgetRefresher.reload()
+    }
+
     // MARK: - Messages
 
     func loadMessages() async {
         messagesError = nil
+        var ok = false
         do {
-            let list = try await messages.messages(in: .received)
-            messagesInbox = list.sorted { ($0.sentDate ?? .distantPast) > ($1.sentDate ?? .distantPast) }
-            if !Seen.messageIDs.hasBaseline {
-                Seen.messageIDs.establishBaseline(Set(list.map(\.id)))
-            }
-            saveCache()
+            try await withOneRetry { try await self.fetchInbox() }
+            ok = true
         } catch {
             handle(error, into: \.messagesError)
         }
@@ -381,6 +437,22 @@ final class DataRepository {
             messagesSent = sent.sorted { ($0.sentDate ?? .distantPast) > ($1.sentDate ?? .distantPast) }
             saveCache()
         }
+        if ok { messagesLastSync = Date() }
+    }
+
+    /// Reload the inbox only if the last successful scrape is older than `maxAge`.
+    func loadMessagesIfStale(maxAge: TimeInterval = 120) async {
+        if let last = messagesLastSync, Date().timeIntervalSince(last) < maxAge { return }
+        await loadMessages()
+    }
+
+    private func fetchInbox() async throws {
+        let list = try await messages.messages(in: .received)
+        messagesInbox = list.sorted { ($0.sentDate ?? .distantPast) > ($1.sentDate ?? .distantPast) }
+        if !Seen.messageIDs.hasBaseline {
+            Seen.messageIDs.establishBaseline(Set(list.map(\.id)))
+        }
+        saveCache()
     }
 
     func loadMessageContent(_ id: Int, folder: MessagesClient.Folder = .received)
@@ -450,6 +522,11 @@ final class DataRepository {
     func setAnnouncementRead(_ item: AnnouncementItem, read: Bool) {
         if read { readAnnouncementIDs.insert(item.id) } else { readAnnouncementIDs.remove(item.id) }
         saveCache()
+        // Mirror the "read" flag to Librus so the website agrees. Best-effort:
+        // a failure just leaves it read locally (the previous behaviour).
+        if read, !item.wasReadOnServer {
+            Task { await api.markAnnouncementReadOnServer(id: item.id) }
+        }
     }
 
     var unreadAnnouncementCount: Int {

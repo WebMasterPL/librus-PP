@@ -2,11 +2,24 @@ import Foundation
 
 /// Tiny JSON-file cache under Application Support, so the app opens with the last
 /// known data and works offline.
+///
+/// The snapshot holds personal data (grades, message senders/subjects, the
+/// student's name), so every file is written with Data Protection. The level is
+/// `completeUntilFirstUserAuthentication` — encrypted at rest, but still readable
+/// by the background-refresh task after the first unlock following a reboot,
+/// matching the keychain's `AfterFirstUnlock` accessibility.
 enum Cache {
+    private static let protection = FileProtectionType.completeUntilFirstUserAuthentication
+
     private static var dir: URL = {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         let url = base.appendingPathComponent("MojLibrusCache", isDirectory: true)
-        try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        try? FileManager.default.createDirectory(
+            at: url, withIntermediateDirectories: true,
+            attributes: [.protectionKey: protection]
+        )
+        // Also covers a directory left over from an older build without protection.
+        try? FileManager.default.setAttributes([.protectionKey: protection], ofItemAtPath: url.path)
         return url
     }()
 
@@ -24,7 +37,11 @@ enum Cache {
 
     static func save<T: Encodable>(_ value: T, as name: String) {
         guard let data = try? encoder.encode(value) else { return }
-        try? data.write(to: dir.appendingPathComponent("\(name).json"), options: .atomic)
+        let url = dir.appendingPathComponent("\(name).json")
+        try? data.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+        // `.atomic` writes via a temp file + rename, which can drop the protection
+        // class on some OS versions — pin it explicitly afterwards.
+        try? FileManager.default.setAttributes([.protectionKey: protection], ofItemAtPath: url.path)
     }
 
     static func load<T: Decodable>(_ type: T.Type, from name: String) -> T? {

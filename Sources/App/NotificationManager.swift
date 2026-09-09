@@ -65,16 +65,40 @@ enum NotificationManager {
         try? await UNUserNotificationCenter.current().add(request)
     }
 
-    static func sendTestNotification() async {
-        guard await isAuthorized() else { return }
+    enum TestOutcome {
+        /// Handed to the system — it should appear in a couple of seconds.
+        case scheduled
+        /// Notifications are turned off for the app (or the OS refused the prompt).
+        case denied
+        /// The system rejected the request itself (rare — e.g. sandboxed container).
+        case failed(String)
+    }
+
+    /// Fires a local notification a few seconds out, requesting permission first if
+    /// it was never asked. Returns what actually happened so the UI can explain it
+    /// (in a LiveContainer / sideload, notifications often don't work at all).
+    static func sendTestNotification() async -> TestOutcome {
+        let center = UNUserNotificationCenter.current()
+        var status = await center.notificationSettings().authorizationStatus
+        if status == .notDetermined {
+            let granted = (try? await center.requestAuthorization(options: [.alert, .sound, .badge])) ?? false
+            status = granted ? .authorized : .denied
+        }
+        guard status == .authorized || status == .provisional else { return .denied }
+
         let content = UNMutableNotificationContent()
         content.title = "Mój Librus"
         content.body = "Powiadomienia działają. Tak wyglądałaby informacja o nowej ocenie."
         content.sound = .default
         let request = UNNotificationRequest(
             identifier: "test-\(UUID().uuidString)", content: content,
-            trigger: UNTimeIntervalNotificationTrigger(timeInterval: 2, repeats: false)
+            trigger: UNTimeIntervalNotificationTrigger(timeInterval: 3, repeats: false)
         )
-        try? await UNUserNotificationCenter.current().add(request)
+        do {
+            try await center.add(request)
+            return .scheduled
+        } catch {
+            return .failed(error.localizedDescription)
+        }
     }
 }

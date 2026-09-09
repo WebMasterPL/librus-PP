@@ -59,7 +59,7 @@ final class AppState {
         await session.logOut()
         repository = nil
         phase = .loggedOut
-        loginError = "Sesja wygasła — zaloguj się ponownie."
+        loginError = "Sesja Librusa wygasła lub zmieniło się hasło — zaloguj się ponownie."
     }
 
     private func startRepository() -> DataRepository {

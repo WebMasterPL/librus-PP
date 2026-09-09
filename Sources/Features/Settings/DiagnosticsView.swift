@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 
 struct DiagnosticsView: View {
     @Environment(AppState.self) private var app
@@ -50,7 +51,14 @@ struct DiagnosticsView: View {
 
                 Section {
                     Button {
-                        UIPasteboard.general.string = Diagnostics.report(results)
+                        // The report can contain teacher names and a message
+                        // snippet — keep it on this device (no Universal Clipboard)
+                        // and let it expire so it doesn't linger.
+                        UIPasteboard.general.setItems(
+                            [[UTType.utf8PlainText.identifier: Diagnostics.report(results)]],
+                            options: [.localOnly: true,
+                                      .expirationDate: Date().addingTimeInterval(10 * 60)]
+                        )
                         Haptics.success()
                         withAnimation(Theme.Motion.quick) { copied = true }
                     } label: {

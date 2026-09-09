@@ -49,12 +49,19 @@ struct AttendanceView: View {
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: Theme.Space.md) {
                     StatTile(value: summary.attendancePercent.map { String(format: "%.0f%%", $0) } ?? "—",
                              label: "Frekwencja", color: .positive, systemImage: "chart.pie.fill")
-                    StatTile(value: "\(summary.absent)", label: "Nieobecności",
+                    StatTile(value: "\(summary.effectiveAbsent)", label: "Nieobecności",
                              color: .negative, systemImage: "xmark")
                     StatTile(value: "\(summary.absentExcused)", label: "Usprawiedliwione",
                              color: .warning, systemImage: "checkmark.shield")
                     StatTile(value: "\(summary.belated)", label: "Spóźnienia",
                              color: .info, systemImage: "clock")
+                }
+
+                if summary.latesCountedAsAbsence > 0 {
+                    Text("Wliczono \(summary.latesCountedAsAbsence) nieob. ze spóźnień (3 spóźnienia = 1 nieobecność). Na liście poniżej pozostają jako spóźnienia.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
                 if !bySubject.isEmpty {

@@ -58,19 +58,20 @@ enum BackgroundRefresh {
     }
 
     static func runAllChecks() async {
-        await runGradeCheck()
-        await runTimetableCheck()
-        await runMessageCheck()
+        // One session for all three checks — a single token refresh, not three
+        // separate ones hammering the portal on every background wake-up.
+        let session = LibrusSession()
+        guard await session.isLoggedIn else { return }
+        await runGradeCheck(session: session)
+        await runTimetableCheck(session: session)
+        await runMessageCheck(session: session)
     }
 
     // MARK: - Grades
 
     /// Fetch grades, notify about any not yet seen, then mark them seen.
-    static func runGradeCheck() async {
+    static func runGradeCheck(session: LibrusSession) async {
         guard UserDefaults.standard.bool(forKey: Keys.grades), SeenGrades.hasBaseline else { return }
-
-        let session = LibrusSession()
-        guard await session.isLoggedIn else { return }
         let api = LibrusAPI(session: session)
 
         guard let rawGrades = await api.grades() else { return }
@@ -103,12 +104,9 @@ enum BackgroundRefresh {
     // MARK: - Timetable changes
 
     /// Scan this + next week for cancellations / substitutions, notify new ones.
-    static func runTimetableCheck() async {
+    static func runTimetableCheck(session: LibrusSession) async {
         guard UserDefaults.standard.bool(forKey: Keys.timetable),
               Seen.timetableChanges.hasBaseline else { return }
-
-        let session = LibrusSession()
-        guard await session.isLoggedIn else { return }
         let api = LibrusAPI(session: session)
 
         let today = LibrusDate.today
@@ -143,11 +141,8 @@ enum BackgroundRefresh {
 
     // MARK: - Messages
 
-    static func runMessageCheck() async {
+    static func runMessageCheck(session: LibrusSession) async {
         guard UserDefaults.standard.bool(forKey: Keys.messages) else { return }
-
-        let session = LibrusSession()
-        guard await session.isLoggedIn else { return }
         let client = MessagesClient(session: session)
         guard let list = try? await client.inbox() else { return }
 

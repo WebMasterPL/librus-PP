@@ -103,10 +103,8 @@ struct MessagesView: View {
         }
         .refreshable { await repo.loadMessages() }
         .task {
-            if !didLoad {
-                didLoad = true
-                await repo.loadMessages()
-            }
+            didLoad = true
+            await repo.loadMessagesIfStale()
         }
         .onDisappear { repo.markMessagesSeen() }
     }

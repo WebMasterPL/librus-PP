@@ -5,6 +5,7 @@ struct SettingsView: View {
     @Environment(DataRepository.self) private var repo
 
     @State private var showLogoutConfirm = false
+    @State private var testNotificationMessage: String?
     @AppStorage(BackgroundRefresh.Keys.grades) private var notifyNewGrades = false
     @AppStorage(BackgroundRefresh.Keys.timetable) private var notifyTimetable = false
     @AppStorage(BackgroundRefresh.Keys.messages) private var notifyMessages = false
@@ -63,7 +64,19 @@ struct SettingsView: View {
                 }
                 if notifyNewGrades || notifyTimetable || notifyMessages {
                     Button {
-                        Task { await NotificationManager.sendTestNotification() }
+                        Task {
+                            switch await NotificationManager.sendTestNotification() {
+                            case .scheduled:
+                                testNotificationMessage = "Wysłane. Powiadomienie powinno pojawić się za chwilę. "
+                                    + "Jeśli nie przychodzi — sprawdź Ustawienia iOS → Powiadomienia → Mój Librus. "
+                                    + "W LiveContainer / sideloadzie powiadomienia często nie działają wcale."
+                            case .denied:
+                                testNotificationMessage = "Powiadomienia są wyłączone dla aplikacji. "
+                                    + "Włącz je w Ustawieniach iOS → Powiadomienia → Mój Librus."
+                            case .failed(let detail):
+                                testNotificationMessage = "System odrzucił powiadomienie: \(detail)"
+                            }
+                        }
                     } label: {
                         Label("Wyślij powiadomienie testowe", systemImage: "paperplane")
                     }
@@ -119,6 +132,12 @@ struct SettingsView: View {
             }
             Button("Anuluj", role: .cancel) {}
         }
+        .alert("Powiadomienie testowe", isPresented: Binding(
+            get: { testNotificationMessage != nil },
+            set: { if !$0 { testNotificationMessage = nil } }
+        ), presenting: testNotificationMessage) { _ in
+            Button("OK", role: .cancel) {}
+        } message: { Text($0) }
     }
 
     private var currentLogin: String? {

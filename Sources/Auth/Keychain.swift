@@ -15,7 +15,11 @@ enum Keychain {
         ]
         let attributes: [String: Any] = [
             kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
+            // `…ThisDeviceOnly`: the item is usable after the first unlock (so the
+            // background-refresh task can reach it), but never leaves this device
+            // — it is excluded from encrypted backups and iCloud Keychain. This is
+            // what makes "dane wyłącznie w Keychainie tego telefonu" actually true.
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
         ]
         let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
         if status == errSecItemNotFound {

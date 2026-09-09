@@ -502,8 +502,8 @@ actor MessagesClient {
     /// `table.decorated.stretch tbody > tr`, cells
     /// `[0]=checkbox [1]=attachment icon [2]=sender [3]=subject [4]=ISO date`,
     /// and a message counts as **read** when cell 2 carries no `style` attribute
-    /// (Librus bolds unread rows inline).
-    private static func parseMessageList(_ html: String) -> [MessageItem] {
+    /// (Librus bolds unread rows inline). (internal for tests)
+    static func parseMessageList(_ html: String) -> [MessageItem] {
         let scope = tableScope(html) ?? html
         var out: [MessageItem] = []
         var seen = Set<Int>()
@@ -526,9 +526,18 @@ actor MessagesClient {
             var attach = false
 
             if text.count >= 5 {
-                sender = text[2].split(separator: "(").first
-                    .map { String($0).trimmingCharacters(in: .whitespaces) }?.nonEmpty ?? text[2]
                 subject = text[3].nonEmpty ?? subject
+                sender = Self.cleanCorrespondent(text[2])
+                // Some rows carry an extra flag cell, shifting the columns — the
+                // parsed "sender" then comes out as a header word ("Nadawca") or
+                // equals the subject. Recover by scanning the leading cells.
+                if Self.looksLikeHeaderLabel(sender) || sender.isEmpty || sender == subject {
+                    sender = (0..<min(3, text.count)).reversed()
+                        .lazy.map { Self.cleanCorrespondent(text[$0]) }
+                        .first { !$0.isEmpty && $0.count > 1
+                            && !Self.looksLikeHeaderLabel($0) && $0 != subject }
+                        ?? "Librus"
+                }
                 dateStr = text[4]
                 let style = HTTP.firstMatch(#"style=["']([^"']*)["']"#, in: attrs[2]) ?? ""
                 unread = !style.trimmingCharacters(in: .whitespaces).isEmpty
@@ -554,6 +563,9 @@ actor MessagesClient {
                 attach = row.range(of: #"(?i)zalacznik|spinacz|<img"#, options: .regularExpression) != nil
             }
 
+            sender = Self.cleanCorrespondent(sender)
+            if Self.looksLikeHeaderLabel(sender) { sender = "Librus" }
+
             let date = LibrusDate.fromISO(dateStr)
             out.append(MessageItem(
                 id: id,
@@ -566,6 +578,30 @@ actor MessagesClient {
             ))
         }
         return out
+    }
+
+    private static let headerLabels: Set<String> =
+        ["nadawca", "adresat", "od", "do", "temat", "tytuł", "tytul", "data", "grupa", "typ"]
+
+    private static func looksLikeHeaderLabel(_ s: String) -> Bool {
+        headerLabels.contains(s.trimmingCharacters(in: .whitespaces).lowercased())
+    }
+
+    /// A sender/recipient cell → clean display name. Strips a parenthesised or
+    /// trailing/leading role label that Synergia sometimes appends
+    /// ("Jan Kowalski (Nauczyciel)", "Jan Kowalski nadawca").
+    private static func cleanCorrespondent(_ raw: String) -> String {
+        var s = (raw.split(separator: "(").first.map(String.init) ?? raw)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        for role in ["nadawca", "adresat", "wychowawca", "nauczyciel"] {
+            if s.lowercased().hasSuffix(" \(role)") {
+                s = String(s.dropLast(role.count + 1)).trimmingCharacters(in: .whitespaces)
+            }
+            if s.lowercased().hasPrefix("\(role) ") {
+                s = String(s.dropFirst(role.count + 1)).trimmingCharacters(in: .whitespaces)
+            }
+        }
+        return s
     }
 
     /// Narrow to the `decorated stretch` message table so page chrome can't

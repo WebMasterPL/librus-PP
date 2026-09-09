@@ -32,6 +32,27 @@ final class PortalAuthTests: XCTestCase {
         XCTAssertNil(fields["email"]) // not hidden
     }
 
+    func testCaptchaDetectionIgnoresBareScriptInclude() {
+        // The plain reCAPTCHA library include must NOT be treated as a challenge —
+        // otherwise a wrong password (or every login) looks like it needs a captcha.
+        let normalLogin = """
+        <form action="/konto-librus/login/action">
+          <input type="hidden" name="_token" value="abc">
+          <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+        </form>
+        """
+        XCTAssertFalse(PortalAuth.showsCaptchaChallenge(normalLogin))
+    }
+
+    func testCaptchaDetectionCatchesRealChallenge() {
+        XCTAssertTrue(PortalAuth.showsCaptchaChallenge(
+            #"<div class="g-recaptcha" data-sitekey="6Lc-abc"></div>"#))
+        XCTAssertTrue(PortalAuth.showsCaptchaChallenge(
+            "<script>grecaptcha.execute('6Lc-abc', {action: 'login'})</script>"))
+        XCTAssertTrue(PortalAuth.showsCaptchaChallenge(
+            "<label>Potwierdź, że nie jesteś robotem</label>"))
+    }
+
     func testDecodeSynergiaAccounts() throws {
         let json = """
         { "lastModification": 1725000000, "accounts": [

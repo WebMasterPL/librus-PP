@@ -40,6 +40,7 @@ struct NotesView: View {
         .background(Color.appGroupedBackground.ignoresSafeArea())
         .navigationTitle("Uwagi")
         .refreshable { await repo.refreshCore() }
+        .task { await repo.refreshCoreIfStale() }
     }
 
     private func icon(for kind: NoteItem.Kind) -> String {

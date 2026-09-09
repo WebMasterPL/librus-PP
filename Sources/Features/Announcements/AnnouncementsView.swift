@@ -49,6 +49,7 @@ struct AnnouncementsView: View {
         .background(Color.appGroupedBackground.ignoresSafeArea())
         .navigationTitle("Ogłoszenia")
         .refreshable { await repo.refreshCore() }
+        .task { await repo.refreshCoreIfStale() }
     }
 }
 

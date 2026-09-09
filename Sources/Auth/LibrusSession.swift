@@ -18,6 +18,10 @@ actor LibrusSession {
         config.timeoutIntervalForRequest = 30
         self.urlSession = URLSession(configuration: config)
         self.credentials = Credentials.load()
+        // Re-persist once so an install upgraded from an older build immediately
+        // picks up the current keychain accessibility (…ThisDeviceOnly) instead of
+        // waiting for the next token refresh. Idempotent, sync, cheap.
+        self.credentials?.save()
     }
 
     var isLoggedIn: Bool { credentials != nil }

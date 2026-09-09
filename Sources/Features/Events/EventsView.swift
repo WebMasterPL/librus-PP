@@ -66,5 +66,6 @@ struct EventsView: View {
         .background(Color.appGroupedBackground.ignoresSafeArea())
         .navigationTitle("Terminarz")
         .refreshable { await repo.refreshCore() }
+        .task { await repo.refreshCoreIfStale() }
     }
 }

@@ -138,11 +138,18 @@ struct AttendanceSummary: Codable, Hashable {
     var belated: Int { counts[.belated] ?? 0 }
     var released: Int { counts[.released] ?? 0 }
 
-    /// present / (present + all absence types)
+    /// Common PL-school rule: every 3 lates become one absence. The individual
+    /// entries still show as lates — only these totals and the percentage change.
+    var latesCountedAsAbsence: Int { belated / 3 }
+    /// Recorded absences plus the ones converted from lates.
+    var effectiveAbsent: Int { absent + latesCountedAsAbsence }
+
+    /// (present + lates that didn't tip into an absence) / everything considered.
     var attendancePercent: Double? {
         let considered = present + absent + absentExcused + belated + released
         guard considered > 0 else { return nil }
-        return Double(present + belated) / Double(considered) * 100
+        let latesStillPresent = belated - latesCountedAsAbsence
+        return Double(present + latesStillPresent) / Double(considered) * 100
     }
 }
 

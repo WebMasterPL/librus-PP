@@ -98,4 +98,13 @@ struct LibrusAPI {
         let path = Librus.Path.timetable(weekStart: LibrusDate.ymdString(weekStart))
         return try await get(path, as: RawTimetableResponse.self).days
     }
+
+    /// Best-effort: tell Librus a school notice was read so the website reflects it
+    /// too. Tries the dedicated marker, then falls back to fetching the detail
+    /// (which marks it read on some Synergia instances). Never throws.
+    func markAnnouncementReadOnServer(id: String) async {
+        let marker = "\(Librus.Path.schoolNotices)/MarkAsRead/\(id)"
+        if (try? await session.authorizedData(path: marker, method: "POST")) != nil { return }
+        _ = try? await session.authorizedData(path: "\(Librus.Path.schoolNotices)/\(id)")
+    }
 }

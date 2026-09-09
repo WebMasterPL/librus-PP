@@ -64,6 +64,7 @@ struct DashboardView: View {
         }
         .refreshable { await refresh() }
         .task {
+            await repo.refreshCoreIfStale()
             if repo.timetableWeeks.isEmpty {
                 await repo.loadTimetable(weekStart: LibrusDate.weekStart())
             }
@@ -176,7 +177,7 @@ struct DashboardView: View {
     // MARK: Recent grades
 
     private var recentGradesCard: some View {
-        SectionCard("Ostatnie oceny", systemImage: "checkmark.seal") {
+        SectionCard("Najnowsze oceny", systemImage: "checkmark.seal") {
             NavigationLink {
                 GradesView()
             } label: {
@@ -185,20 +186,34 @@ struct DashboardView: View {
         } content: {
             VStack(spacing: Theme.Space.sm) {
                 ForEach(recentGrades) { grade in
-                    HStack(spacing: Theme.Space.md) {
-                        Pill(text: grade.raw, color: gradeColor(for: grade.value))
-                            .frame(minWidth: 40)
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(grade.subjectName).font(.callout).lineLimit(1)
-                            if !grade.categoryName.isEmpty {
-                                Text(grade.categoryName).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    NavigationLink { GradeDetailView(grade: grade) } label: {
+                        HStack(spacing: Theme.Space.md) {
+                            Pill(text: grade.raw, color: gradeColor(for: grade.value))
+                                .frame(minWidth: 40)
+                            VStack(alignment: .leading, spacing: 2) {
+                                HStack(spacing: Theme.Space.xs) {
+                                    Text(grade.subjectName).font(.callout).lineLimit(1)
+                                    if repo.isGradeUnseen(grade) {
+                                        Text("NOWE")
+                                            .font(.system(size: 9, weight: .heavy))
+                                            .foregroundStyle(.white)
+                                            .padding(.horizontal, 5).padding(.vertical, 1.5)
+                                            .background(.tint, in: Capsule())
+                                    }
+                                }
+                                HStack(spacing: Theme.Space.sm) {
+                                    if !grade.categoryName.isEmpty { Text(grade.categoryName).lineLimit(1) }
+                                    if grade.weight > 0 { Text("waga \(GradeMath.format(grade.weight))") }
+                                }
+                                .font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer(minLength: Theme.Space.sm)
+                            if let date = grade.date {
+                                Text(date.dayMonthShort).font(.caption).foregroundStyle(.tertiary)
                             }
                         }
-                        Spacer(minLength: Theme.Space.sm)
-                        if let date = grade.date {
-                            Text(date.dayMonthShort).font(.caption).foregroundStyle(.tertiary)
-                        }
                     }
+                    .buttonStyle(.plain)
                 }
             }
         }

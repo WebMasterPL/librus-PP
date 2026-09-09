@@ -43,7 +43,7 @@ struct TimetableProvider: TimelineProvider {
             if cal.isDateInToday(d.date) {
                 let endMin = d.lessons.compactMap { minutes($0.end) }.max() ?? 0
                 let nowMin = cal.component(.hour, from: now) * 60 + cal.component(.minute, from: now)
-                if nowMin < endMin || d.lessons.isEmpty == false && nowMin < endMin {
+                if nowMin < endMin {
                     chosen = d; label = "Dziś"; break
                 }
             } else if d.date > now {

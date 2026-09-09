@@ -131,7 +131,7 @@ actor PortalAuth {
             throw APIError.librus(code: "portal_flow",
                 message: "Nie dotarłem do formularza logowania (wylądowałem na \(landed), \(pageData.count) B).")
         }
-        if loginHTML.range(of: "recaptcha|g-recaptcha|grecaptcha", options: .regularExpression) != nil {
+        if Self.showsCaptchaChallenge(loginHTML) {
             throw APIError.captchaNeeded
         }
 
@@ -166,10 +166,9 @@ actor PortalAuth {
         let finalURL = (postResponse.url?.absoluteString ?? "")
         let body = String(data: postData, encoding: .utf8) ?? ""
 
-        if body.range(of: "recaptcha|g-recaptcha", options: .regularExpression) != nil
-            || finalURL.contains("captcha") {
-            throw APIError.captchaNeeded
-        }
+        // Check the specific, unambiguous page states first. A wrong password must
+        // never be reported as "captcha" just because the login page happens to
+        // ship the reCAPTCHA script unconditionally.
         let badCreds = ["Upewnij się, że nie", "Podany adres e-mail jest nieprawidłowy",
                         "nieprawidłowy login lub hasło", "Nieprawidłowe dane logowania",
                         "Konto zostało zablokowane"]
@@ -178,6 +177,9 @@ actor PortalAuth {
         }
         if body.contains("Sesja logowania wygasła") || postResponse.statusCode == 419 {
             throw APIError.librus(code: "csrf", message: "Sesja portalu wygasła (CSRF). Spróbuj ponownie.")
+        }
+        if finalURL.contains("captcha") || Self.showsCaptchaChallenge(body) {
+            throw APIError.captchaNeeded
         }
         if finalURL.contains("/konto-librus/login") {
             throw APIError.invalidCredentials
@@ -267,6 +269,16 @@ actor PortalAuth {
     private func dataOrThrow(_ request: URLRequest) async throws -> (Data, URLResponse) {
         do { return try await http.data(for: request) }
         catch { throw APIError.network(error.localizedDescription) }
+    }
+
+    /// True only when the HTML carries a *rendered* captcha challenge. A bare
+    /// `recaptcha/api.js` include — which the portal login page may always ship —
+    /// is deliberately not enough, otherwise every single login would be reported
+    /// as needing a captcha and the app would be unusable. (internal for tests)
+    static func showsCaptchaChallenge(_ html: String) -> Bool {
+        html.range(of: #"data-sitekey=|grecaptcha\.(execute|render)\("#,
+                   options: .regularExpression) != nil
+            || html.range(of: #"(?i)nie jeste(m|ś) robotem"#, options: .regularExpression) != nil
     }
 
     private func codeFromLocation(_ location: String) -> String? {
