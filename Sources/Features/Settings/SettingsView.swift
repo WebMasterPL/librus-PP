@@ -68,11 +68,11 @@ struct SettingsView: View {
                             switch await NotificationManager.sendTestNotification() {
                             case .scheduled:
                                 testNotificationMessage = "Wysłane. Powiadomienie powinno pojawić się za chwilę. "
-                                    + "Jeśli nie przychodzi — sprawdź Ustawienia iOS → Powiadomienia → Mój Librus. "
+                                    + "Jeśli nie przychodzi — sprawdź Ustawienia iOS → Powiadomienia → Librus Plus. "
                                     + "W LiveContainer / sideloadzie powiadomienia często nie działają wcale."
                             case .denied:
                                 testNotificationMessage = "Powiadomienia są wyłączone dla aplikacji. "
-                                    + "Włącz je w Ustawieniach iOS → Powiadomienia → Mój Librus."
+                                    + "Włącz je w Ustawieniach iOS → Powiadomienia → Librus Plus."
                             case .failed(let detail):
                                 testNotificationMessage = "System odrzucił powiadomienie: \(detail)"
                             }

@@ -1,10 +1,10 @@
 {
-  "name": "Mój Librus",
+  "name": "Librus Plus",
   "identifier": "eu.mojlibrus.app.source",
   "sourceURL": "https://github.com/WebMasterPL/librus-PP/releases/latest/download/apps.json",
   "apps": [
     {
-      "name": "Mój Librus",
+      "name": "Librus Plus",
       "bundleIdentifier": "eu.mojlibrus.app",
       "developerName": "WebMasterPL",
       "subtitle": "Nieoficjalny klient Librus Synergia",

@@ -87,7 +87,7 @@ enum NotificationManager {
         guard status == .authorized || status == .provisional else { return .denied }
 
         let content = UNMutableNotificationContent()
-        content.title = "Mój Librus"
+        content.title = "Librus Plus"
         content.body = "Powiadomienia działają. Tak wyglądałaby informacja o nowej ocenie."
         content.sound = .default
         let request = UNNotificationRequest(

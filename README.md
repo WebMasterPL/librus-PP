@@ -1,4 +1,4 @@
-# Mój Librus
+# Librus Plus
 
 Nieoficjalny klient iOS (SwiftUI) dla dziennika **Librus Synergia**. Funkcjonalnie
 wzorowany na [szkolny.eu](https://szkolny.eu), ale obsługuje **wyłącznie Librusa**.
@@ -46,7 +46,7 @@ ekranu — zostają dane z cache (tryb offline).
    ```
    https://github.com/WebMasterPL/librus-PP/releases/latest/download/apps.json
    ```
-3. Otwórz „Mój Librus" na liście źródła → **Install**. SideStore podpisze apkę Twoim
+3. Otwórz „Librus Plus" na liście źródła → **Install**. SideStore podpisze apkę Twoim
    darmowym Apple ID.
 4. Uruchom, zaloguj się **e‑mailem Konta LIBRUS** (nie loginem `1234567u`).
 
