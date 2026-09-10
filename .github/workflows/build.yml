@@ -15,7 +15,10 @@ permissions:
 
 jobs:
   build:
-    runs-on: macos-14
+    # macOS 26 image — the only one carrying Xcode 26 (iOS 26 SDK). Building
+    # against that SDK is what turns Liquid Glass on for the system chrome, and
+    # it is required for every explicit glass API. macos-14 tops out at Xcode 16.2.
+    runs-on: macos-26
     timeout-minutes: 30
     env:
       SCHEME: MojLibrus
