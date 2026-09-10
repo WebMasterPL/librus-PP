@@ -87,27 +87,52 @@ struct DashboardView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                if let lesson = currentLesson {
-                    lessonHeadline(kicker: "Teraz · do \(lesson.end)", lesson: lesson, accent: true)
-                } else if let lesson = nextLesson {
-                    lessonHeadline(kicker: "Następna · \(lesson.start)", lesson: lesson, accent: false)
-                } else {
-                    HStack(spacing: Theme.Space.md) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.title)
-                            .foregroundStyle(.tint)
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(todayEntries.isEmpty ? "Dziś nie ma lekcji" : "Lekcje na dziś zakończone")
-                                .font(.headline)
-                            Text("Miłego dnia").font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
+                // Ticks every minute so the countdown updates and the card rolls
+                // over from "Teraz" → "Następna" → "zakończone" on its own.
+                TimelineView(.everyMinute) { _ in
+                    nowLesson
                 }
             }
         }
     }
 
-    private func lessonHeadline(kicker: String, lesson: TimetableEntry, accent: Bool) -> some View {
+    @ViewBuilder private var nowLesson: some View {
+        let nowSec = LibrusDate.nowSecondsOfDay
+        if let lesson = currentLesson {
+            lessonHeadline(
+                kicker: "Teraz · do \(lesson.end)", lesson: lesson, accent: true,
+                countdown: lesson.endMinutes.map {
+                    Countdown(minutesLeft: minutesCeil($0 * 60 - nowSec), caption: "do końca")
+                }
+            )
+        } else if let lesson = nextLesson {
+            let startsIn = (lesson.startMinutes ?? 0) * 60 - nowSec
+            lessonHeadline(
+                kicker: "Następna · \(lesson.start)", lesson: lesson, accent: false,
+                countdown: lesson.startMinutes != nil && startsIn <= 90 * 60
+                    ? Countdown(minutesLeft: minutesCeil(startsIn), caption: "do startu")
+                    : nil
+            )
+        } else {
+            HStack(spacing: Theme.Space.md) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.title)
+                    .foregroundStyle(.tint)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(todayEntries.isEmpty ? "Dziś nie ma lekcji" : "Lekcje na dziś zakończone")
+                        .font(.headline)
+                    Text("Miłego dnia").font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    /// Seconds → whole minutes, rounded up, never negative.
+    private func minutesCeil(_ seconds: Int) -> Int { max(0, (seconds + 59) / 60) }
+
+    private func lessonHeadline(
+        kicker: String, lesson: TimetableEntry, accent: Bool, countdown: Countdown? = nil
+    ) -> some View {
         HStack(spacing: Theme.Space.md) {
             RoundedRectangle(cornerRadius: 3)
                 .fill(accent ? AnyShapeStyle(.tint) : AnyShapeStyle(Color.appHairline))
@@ -130,7 +155,27 @@ struct DashboardView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Theme.Space.sm)
+            countdown
+        }
+    }
+
+    /// Trailing minutes-remaining readout on the "now" card.
+    private struct Countdown: View {
+        let minutesLeft: Int
+        let caption: String
+
+        var body: some View {
+            VStack(alignment: .trailing, spacing: 1) {
+                Text("\(minutesLeft) min")
+                    .font(.headline.weight(.bold).monospacedDigit())
+                    .foregroundStyle(.tint)
+                Text(caption)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .fixedSize()
+            .accessibilityElement(children: .combine)
         }
     }
 

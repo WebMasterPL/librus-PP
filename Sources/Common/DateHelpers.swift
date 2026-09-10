@@ -83,6 +83,11 @@ enum LibrusDate {
         let c = calendar.dateComponents([.hour, .minute], from: Date())
         return (c.hour ?? 0) * 60 + (c.minute ?? 0)
     }
+
+    static var nowSecondsOfDay: Int {
+        let c = calendar.dateComponents([.hour, .minute, .second], from: Date())
+        return (c.hour ?? 0) * 3600 + (c.minute ?? 0) * 60 + (c.second ?? 0)
+    }
 }
 
 extension Date {
