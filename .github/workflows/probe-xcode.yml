@@ -1,0 +1,28 @@
+name: probe-xcode
+
+# Throwaway: reports which macOS runner labels resolve and which Xcode / iOS SDK
+# versions they carry, so the build workflow can be moved to an iOS 26 SDK
+# (required for any Liquid Glass API). Delete once the answer is recorded.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-14, macos-15, macos-26]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    steps:
+      - name: Report toolchain
+        run: |
+          echo "== runner label: ${{ matrix.runner }}"
+          echo "== macOS: $(sw_vers -productVersion)"
+          echo "== installed Xcodes:"
+          ls -d /Applications/Xcode*.app 2>/dev/null || echo "(none)"
+          echo "== selected xcodebuild:"
+          xcodebuild -version || true
+          echo "== iOS SDKs:"
+          xcodebuild -showsdks 2>/dev/null | grep -i ios || true
