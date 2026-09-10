@@ -196,6 +196,9 @@ final class DataRepository {
         do {
             try await withOneRetry { try await self.performCoreFetch() }
             lastError = nil
+            // Sideload can't rely on the background task firing — also surface new
+            // grades / timetable changes / messages as notifications on open.
+            await BackgroundRefresh.runForegroundChecksIfDue(session: session)
         } catch {
             handle(error, into: \.lastError)
         }

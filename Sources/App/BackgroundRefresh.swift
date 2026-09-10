@@ -21,6 +21,23 @@ enum BackgroundRefresh {
         return d.bool(forKey: Keys.grades) || d.bool(forKey: Keys.timetable) || d.bool(forKey: Keys.messages)
     }
 
+    /// iOS almost never runs `BGTaskScheduler` for sideloaded apps, so the same
+    /// checks also run when the app is opened / returns to the foreground. Throttled
+    /// so bouncing in and out doesn't re-hit every endpoint on each switch.
+    private static let lastForegroundCheckKey = "lastForegroundNotificationCheck"
+
+    static func runForegroundChecksIfDue(
+        session: LibrusSession, minInterval: TimeInterval = 15 * 60
+    ) async {
+        guard anyEnabled else { return }
+        let d = UserDefaults.standard
+        let now = Date().timeIntervalSince1970
+        let last = d.double(forKey: lastForegroundCheckKey)
+        if last > 0, now - last < minInterval { return }
+        d.set(now, forKey: lastForegroundCheckKey)
+        await runAllChecks(session: session)
+    }
+
     private static var didRegister = false
 
     /// Call once, before the app finishes launching.
@@ -57,10 +74,11 @@ enum BackgroundRefresh {
         task.expirationHandler = { work.cancel() }
     }
 
-    static func runAllChecks() async {
+    static func runAllChecks(session: LibrusSession? = nil) async {
         // One session for all three checks — a single token refresh, not three
-        // separate ones hammering the portal on every background wake-up.
-        let session = LibrusSession()
+        // separate ones hammering the portal on every background wake-up. The
+        // foreground caller passes its live session so we don't spin up a second one.
+        let session = session ?? LibrusSession()
         guard await session.isLoggedIn else { return }
         await runGradeCheck(session: session)
         await runTimetableCheck(session: session)

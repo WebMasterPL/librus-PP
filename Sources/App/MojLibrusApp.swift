@@ -2,11 +2,8 @@ import SwiftUI
 
 @main
 struct MojLibrusApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var appState = AppState()
-
-    init() {
-        BackgroundRefresh.register()
-    }
 
     var body: some Scene {
         WindowGroup {
