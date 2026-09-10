@@ -7,6 +7,14 @@ struct TimetableView: View {
     @State private var weekStart = LibrusDate.defaultTimetableWeekStart()
     @State private var isLoading = false
     @State private var jumpTick = 0
+    @State private var selection: LessonSelection?
+
+    /// A tapped lesson plus the day it belongs to — the entry alone has no date.
+    struct LessonSelection: Identifiable {
+        let entry: TimetableEntry
+        let date: Date
+        var id: String { entry.id }
+    }
 
     private var weekKey: String { LibrusDate.ymdString(weekStart) }
     private var days: [TimetableDay] { repo.timetableWeeks[weekKey] ?? [] }
@@ -68,6 +76,9 @@ struct TimetableView: View {
         .task(id: weekKey) { await loadIfNeeded() }
         .refreshable { await load() }
         .onDisappear { repo.markTimetableChangesSeen() }
+        .sheet(item: $selection) { picked in
+            LessonDetailView(entry: picked.entry, date: picked.date)
+        }
     }
 
     private func jumpToToday(_ proxy: ScrollViewProxy, animated: Bool) {
@@ -106,6 +117,16 @@ struct TimetableView: View {
         }
         .padding(.horizontal, Theme.Space.sm)
         .padding(.vertical, Theme.Space.xs)
+        // Swipe the switcher itself — attaching this to the scroll area below would
+        // fight the vertical scroll gesture.
+        .contentShape(Rectangle())
+        .gesture(
+            DragGesture(minimumDistance: 30)
+                .onEnded { value in
+                    if value.translation.width < -40 { shift(7) }
+                    else if value.translation.width > 40 { shift(-7) }
+                }
+        )
     }
 
     private func dayCard(_ day: TimetableDay) -> some View {
@@ -133,7 +154,14 @@ struct TimetableView: View {
                 } else {
                     VStack(spacing: 0) {
                         ForEach(Array(day.entries.enumerated()), id: \.element.id) { idx, entry in
-                            LessonRow(entry: entry, highlight: isToday && entry.isOngoing())
+                            Button {
+                                Haptics.tap()
+                                selection = LessonSelection(entry: entry, date: day.date)
+                            } label: {
+                                LessonRow(entry: entry, highlight: isToday && entry.isOngoing())
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
                             if idx < day.entries.count - 1 {
                                 Divider().padding(.leading, 58).opacity(0.4)
                             }
@@ -228,5 +256,87 @@ struct LessonRow: View {
         .foregroundStyle(color)
         .padding(.horizontal, Theme.Space.sm).padding(.vertical, 2)
         .background(color.opacity(0.14), in: Capsule())
+    }
+}
+
+// MARK: - Lesson detail
+
+/// Everything Librus knows about one slot — the row itself only has room for a
+/// summary, and the substitution note in particular is usually truncated there.
+struct LessonDetailView: View {
+    let entry: TimetableEntry
+    let date: Date
+
+    @Environment(\.dismiss) private var dismiss
+
+    private var hasChange: Bool {
+        entry.isCancelled || entry.isSubstitution || entry.roomChanged
+            || !(entry.note ?? "").isEmpty
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    KeyValueRow(key: "Przedmiot", value: entry.subject)
+                    KeyValueRow(key: "Lekcja", value: "\(entry.lessonNo)")
+                    KeyValueRow(key: "Godziny", value: "\(entry.start) – \(entry.end)")
+                    KeyValueRow(key: "Dzień", value: "\(date.weekdayName.capitalized), \(date.dayMonthYear)")
+                    if let minutes = length {
+                        KeyValueRow(key: "Czas trwania", value: "\(minutes) min")
+                    }
+                }
+
+                if entry.teacher != nil || entry.classroom != nil {
+                    Section {
+                        if let teacher = entry.teacher {
+                            KeyValueRow(key: "Nauczyciel", value: teacher)
+                        }
+                        if let room = entry.classroom {
+                            KeyValueRow(key: "Sala", value: room)
+                        }
+                        if entry.roomChanged, let original = entry.originalClassroom {
+                            KeyValueRow(key: "Sala pierwotna", value: original)
+                        }
+                    }
+                }
+
+                if hasChange {
+                    Section("Zmiany") {
+                        if entry.isCancelled {
+                            Label("Lekcja odwołana", systemImage: "xmark.circle.fill")
+                                .foregroundStyle(Color.negative)
+                        }
+                        if entry.isSubstitution {
+                            Label("Zastępstwo", systemImage: "arrow.triangle.2.circlepath")
+                                .foregroundStyle(Color.warning)
+                        }
+                        if entry.roomChanged {
+                            Label("Zmiana sali", systemImage: "arrow.left.arrow.right")
+                                .foregroundStyle(Color.warning)
+                        }
+                        if let note = entry.note, !note.isEmpty {
+                            Text(note).font(.callout).textSelection(.enabled)
+                        }
+                    }
+                }
+            }
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .background(Color.appGroupedBackground.ignoresSafeArea())
+            .navigationTitle(entry.subject)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Gotowe") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    private var length: Int? {
+        guard let s = entry.startMinutes, let e = entry.endMinutes, e > s else { return nil }
+        return e - s
     }
 }

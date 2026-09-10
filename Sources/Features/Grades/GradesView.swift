@@ -4,11 +4,31 @@ struct GradesView: View {
     @Environment(DataRepository.self) private var repo
     @State private var filter: SemesterFilter = .current
     @State private var simulatorSubject: SubjectGrades?
+    @State private var search = ""
 
     private var current: Int { repo.currentSemester }
 
+    private var query: String {
+        search.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Grades of a subject after the semester filter and the search query. A query
+    /// that matches the subject name keeps all of its grades; otherwise only the
+    /// grades that match themselves (category, teacher, the mark) stay.
+    private func grades(in subject: SubjectGrades) -> [GradeItem] {
+        let all = subject.filtered(filter, current: current)
+        guard !query.isEmpty, !subject.subjectName.localizedCaseInsensitiveContains(query) else {
+            return all
+        }
+        return all.filter {
+            $0.categoryName.localizedCaseInsensitiveContains(query)
+                || $0.teacherName.localizedCaseInsensitiveContains(query)
+                || $0.raw.localizedCaseInsensitiveContains(query)
+        }
+    }
+
     private var visibleSubjects: [SubjectGrades] {
-        repo.subjectGrades.filter { !$0.filtered(filter, current: current).isEmpty }
+        repo.subjectGrades.filter { !grades(in: $0).isEmpty }
     }
 
     private var overallAverage: Double? {
@@ -25,12 +45,9 @@ struct GradesView: View {
             }
 
             Section {
-                Picker("Semestr", selection: $filter) {
-                    ForEach(SemesterFilter.allCases) { Text($0.label).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .listRowInsets(EdgeInsets(top: Theme.Space.xs, leading: 0, bottom: Theme.Space.sm, trailing: 0))
-                .listRowBackground(Color.clear)
+                SemesterPicker(selection: $filter)
+                    .listRowInsets(EdgeInsets(top: Theme.Space.xs, leading: 0, bottom: Theme.Space.sm, trailing: 0))
+                    .listRowBackground(Color.clear)
 
                 if let avg = overallAverage {
                     HStack {
@@ -42,29 +59,43 @@ struct GradesView: View {
                             .fontDesign(.rounded)
                             .foregroundStyle(gradeColor(for: avg))
                     }
+                    .accessibilityElement(children: .combine)
                 }
             }
 
             if visibleSubjects.isEmpty {
                 Section {
-                    EmptyStateView(systemImage: "checkmark.seal", title: "Brak ocen",
-                                   message: "Zmień semestr lub pociągnij w dół, aby odświeżyć.")
+                    EmptyStateView(
+                        systemImage: query.isEmpty ? "checkmark.seal" : "magnifyingglass",
+                        title: query.isEmpty ? "Brak ocen" : "Nic nie znaleziono",
+                        message: query.isEmpty
+                            ? "Zmień semestr lub pociągnij w dół, aby odświeżyć."
+                            : "Brak ocen pasujących do „\(query)”."
+                    )
                 }
             }
 
             ForEach(visibleSubjects) { subject in
                 Section {
-                    ForEach(subject.filtered(filter, current: current)) { grade in
+                    ForEach(grades(in: subject)) { grade in
                         NavigationLink {
                             GradeDetailView(grade: grade)
                         } label: {
                             GradeRow(grade: grade, isNew: repo.isGradeUnseen(grade))
                         }
+                        .contextMenu {
+                            Button {
+                                Haptics.tap()
+                                simulatorSubject = subject
+                            } label: {
+                                Label("Symulator średniej", systemImage: "function")
+                            }
+                        }
                     }
                 } header: {
-                    HStack {
+                    HStack(spacing: Theme.Space.sm) {
                         Text(subject.subjectName)
-                        Spacer()
+                        Spacer(minLength: Theme.Space.sm)
                         if let avg = subject.average(filter, current: current) {
                             Text(GradeMath.format(avg))
                                 .fontDesign(.rounded)
@@ -75,10 +106,14 @@ struct GradesView: View {
                             simulatorSubject = subject
                         } label: {
                             Image(systemName: "function")
-                                .font(.footnote.weight(.semibold))
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(.tint)
+                                .padding(.horizontal, Theme.Space.sm)
+                                .padding(.vertical, 3)
+                                .background(Color.appFill, in: Capsule())
                         }
                         .buttonStyle(.borderless)
-                        .accessibilityLabel("Kalkulator średniej — \(subject.subjectName)")
+                        .accessibilityLabel("Symulator średniej — \(subject.subjectName)")
                     }
                     .textCase(nil)
                 }
@@ -88,6 +123,7 @@ struct GradesView: View {
         .scrollContentBackground(.hidden)
         .background(Color.appGroupedBackground.ignoresSafeArea())
         .navigationTitle("Oceny")
+        .searchable(text: $search, prompt: "Przedmiot, kategoria, nauczyciel")
         .refreshable { await repo.refreshCore() }
         .onDisappear { repo.markGradesSeen() }
         .sheet(item: $simulatorSubject) { subject in
@@ -129,6 +165,19 @@ struct GradeRow: View {
             Spacer(minLength: 0)
         }
         .padding(.vertical, 2)
+        // The mark's colour carries meaning — spell the whole row out for VoiceOver.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityText)
+    }
+
+    private var accessibilityText: String {
+        var parts = ["Ocena \(grade.raw)"]
+        let name = grade.categoryName.isEmpty ? Self.label(for: grade.kind) : grade.categoryName
+        parts.append(name)
+        if grade.weight > 0 { parts.append("waga \(GradeMath.format(grade.weight))") }
+        if let date = grade.date { parts.append(date.dayMonthYear) }
+        if isNew { parts.append("nowa") }
+        return parts.joined(separator: ", ")
     }
 
     static func label(for kind: GradeKind) -> String {

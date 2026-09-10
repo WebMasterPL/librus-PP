@@ -193,24 +193,28 @@ struct DashboardView: View {
                 Text("Brak lekcji w planie na dziś.")
                     .font(.subheadline).foregroundStyle(.secondary)
             } else {
-                VStack(spacing: Theme.Space.sm) {
-                    ForEach(upcomingEntries) { entry in
-                        let ongoing = entry.isOngoing()
-                        HStack(spacing: Theme.Space.md) {
-                            Text(entry.start)
-                                .font(.callout.monospacedDigit())
-                                .fontWeight(ongoing ? .semibold : .regular)
-                                .foregroundStyle(ongoing ? AnyShapeStyle(.tint) : AnyShapeStyle(Color.secondary))
-                                .frame(width: 46, alignment: .leading)
-                            Text(entry.subject)
-                                .font(.callout)
-                                .fontWeight(ongoing ? .medium : .regular)
-                                .strikethrough(entry.isCancelled)
-                            Spacer(minLength: Theme.Space.sm)
-                            if entry.roomChanged, let r = entry.classroom {
-                                Chip(text: "→ \(r)", tint: .warning)
-                            } else if let r = entry.classroom {
-                                Text(r).font(.caption).foregroundStyle(.tertiary)
+                // Same minute tick as the "now" card, so the list drops finished
+                // lessons and re-highlights the current one without a refresh.
+                TimelineView(.everyMinute) { _ in
+                    VStack(spacing: Theme.Space.sm) {
+                        ForEach(upcomingEntries) { entry in
+                            let ongoing = entry.isOngoing()
+                            HStack(spacing: Theme.Space.md) {
+                                Text(entry.start)
+                                    .font(.callout.monospacedDigit())
+                                    .fontWeight(ongoing ? .semibold : .regular)
+                                    .foregroundStyle(ongoing ? AnyShapeStyle(.tint) : AnyShapeStyle(Color.secondary))
+                                    .frame(minWidth: 46, alignment: .leading)
+                                Text(entry.subject)
+                                    .font(.callout)
+                                    .fontWeight(ongoing ? .medium : .regular)
+                                    .strikethrough(entry.isCancelled)
+                                Spacer(minLength: Theme.Space.sm)
+                                if entry.roomChanged, let r = entry.classroom {
+                                    Chip(text: "→ \(r)", tint: .warning)
+                                } else if let r = entry.classroom {
+                                    Text(r).font(.caption).foregroundStyle(.tertiary)
+                                }
                             }
                         }
                     }

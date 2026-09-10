@@ -41,10 +41,7 @@ struct AttendanceView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: Theme.Space.lg) {
-                Picker("Semestr", selection: $filter) {
-                    ForEach(SemesterFilter.allCases) { Text($0.label).tag($0) }
-                }
-                .pickerStyle(.segmented)
+                SemesterPicker(selection: $filter)
 
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: Theme.Space.md) {
                     StatTile(value: summary.attendancePercent.map { String(format: "%.0f%%", $0) } ?? "—",

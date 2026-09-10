@@ -5,6 +5,7 @@ struct LoginView: View {
 
     @State private var login = ""
     @State private var password = ""
+    @State private var revealPassword = false
     @FocusState private var focus: Field?
 
     private enum Field { case login, password }
@@ -39,11 +40,33 @@ struct LoginView: View {
                         .onSubmit { focus = .password }
                 }
                 fieldRow(icon: "lock.fill") {
-                    SecureField("Hasło", text: $password)
-                        .textContentType(.password)
-                        .focused($focus, equals: .password)
-                        .submitLabel(.go)
-                        .onSubmit(attemptLogin)
+                    Group {
+                        if revealPassword {
+                            TextField("Hasło", text: $password)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                        } else {
+                            SecureField("Hasło", text: $password)
+                        }
+                    }
+                    .textContentType(.password)
+                    .focused($focus, equals: .password)
+                    .submitLabel(.go)
+                    .onSubmit(attemptLogin)
+
+                    Button {
+                        revealPassword.toggle()
+                        // Swapping SecureField <-> TextField rebuilds the field, so
+                        // hand focus back or the keyboard drops mid-typing.
+                        focus = .password
+                    } label: {
+                        Image(systemName: revealPassword ? "eye.slash.fill" : "eye.fill")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .frame(width: 24, height: 24)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(revealPassword ? "Ukryj hasło" : "Pokaż hasło")
                 }
             }
 
@@ -68,6 +91,9 @@ struct LoginView: View {
             VStack(spacing: Theme.Space.sm) {
                 Text("Zaloguj się **e‑mailem Konta LIBRUS** — tym samym co w oficjalnej apce Librus / na konto.librus.pl. Sam login szkolny (`1234567u`) tu nie zadziała.")
                 Text("Nie masz Konta LIBRUS? Załóż je na konto.librus.pl i połącz z Synergią.")
+                Link("Nie pamiętam hasła / załóż konto", destination: URL(string: "https://konto.librus.pl")!)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tint)
                 Text("Nieoficjalny klient, bez związku z firmą Librus. Dane logowania trzymane są wyłącznie w Keychainie tego urządzenia.")
                     .foregroundStyle(.tertiary)
             }

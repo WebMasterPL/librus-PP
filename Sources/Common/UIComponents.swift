@@ -180,7 +180,7 @@ struct ErrorBanner: View {
     var body: some View {
         HStack(alignment: .top, spacing: Theme.Space.md) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(.orange)
+                .foregroundStyle(Color.warning)
             VStack(alignment: .leading, spacing: Theme.Space.xs) {
                 Text(message).font(.footnote)
                 if let retry {
@@ -193,7 +193,22 @@ struct ErrorBanner: View {
             Spacer(minLength: 0)
         }
         .padding(Theme.Space.md)
-        .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+        .background(Color.warning.opacity(0.12),
+                    in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+    }
+}
+
+// MARK: - Shared controls
+
+/// The semester segmented control shared by Oceny / Frekwencja.
+struct SemesterPicker: View {
+    @Binding var selection: SemesterFilter
+
+    var body: some View {
+        Picker("Semestr", selection: $selection) {
+            ForEach(SemesterFilter.allCases) { Text($0.label).tag($0) }
+        }
+        .pickerStyle(.segmented)
     }
 }
 

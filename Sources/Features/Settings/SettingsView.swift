@@ -146,12 +146,14 @@ struct SettingsView: View {
     /// switching one on (revert via `revert` if denied), (re)schedule or cancel the
     /// background task based on whether any are still on.
     private func handleToggle(_ turnedOn: Bool, revert: @escaping () -> Void) {
+        Haptics.selection()
         Task {
             if turnedOn {
                 let granted = await NotificationManager.requestAuthorization()
                 if granted {
                     BackgroundRefresh.scheduleIfEnabled()
                 } else {
+                    Haptics.warning()
                     revert()
                 }
             } else if !BackgroundRefresh.anyEnabled {

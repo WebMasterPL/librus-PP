@@ -5,9 +5,19 @@ struct MessagesView: View {
     @State private var didLoad = false
     @State private var showCompose = false
     @State private var folder: MessagesClient.Folder = .received
+    @State private var search = ""
+
+    private var query: String {
+        search.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 
     private var items: [MessageItem] {
-        folder == .received ? repo.messagesInbox : repo.messagesSent
+        let base = folder == .received ? repo.messagesInbox : repo.messagesSent
+        guard !query.isEmpty else { return base }
+        return base.filter {
+            $0.correspondent.localizedCaseInsensitiveContains(query)
+                || $0.subject.localizedCaseInsensitiveContains(query)
+        }
     }
 
     var body: some View {
@@ -33,9 +43,14 @@ struct MessagesView: View {
             }
 
             if items.isEmpty && repo.messagesError == nil {
-                EmptyStateView(systemImage: "envelope",
-                               title: folder == .received ? "Brak wiadomości" : "Brak wysłanych",
-                               message: didLoad ? nil : "Wczytywanie…")
+                if query.isEmpty {
+                    EmptyStateView(systemImage: "envelope",
+                                   title: folder == .received ? "Brak wiadomości" : "Brak wysłanych",
+                                   message: didLoad ? nil : "Wczytywanie…")
+                } else {
+                    EmptyStateView(systemImage: "magnifyingglass", title: "Nic nie znaleziono",
+                                   message: "Brak wiadomości pasujących do „\(query)”.")
+                }
             }
 
             ForEach(items) { message in
@@ -88,6 +103,7 @@ struct MessagesView: View {
         .scrollContentBackground(.hidden)
         .background(Color.appGroupedBackground.ignoresSafeArea())
         .navigationTitle("Wiadomości")
+        .searchable(text: $search, prompt: "Nadawca lub temat")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {

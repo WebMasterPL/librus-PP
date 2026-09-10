@@ -2,13 +2,31 @@ import SwiftUI
 
 struct AnnouncementsView: View {
     @Environment(DataRepository.self) private var repo
+    @State private var search = ""
+
+    private var query: String {
+        search.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var visible: [AnnouncementItem] {
+        guard !query.isEmpty else { return repo.announcements }
+        return repo.announcements.filter {
+            $0.subject.localizedCaseInsensitiveContains(query)
+                || $0.content.localizedCaseInsensitiveContains(query)
+                || ($0.author?.localizedCaseInsensitiveContains(query) ?? false)
+        }
+    }
 
     var body: some View {
         List {
-            if repo.announcements.isEmpty {
-                EmptyStateView(systemImage: "megaphone", title: "Brak ogłoszeń")
+            if visible.isEmpty {
+                EmptyStateView(
+                    systemImage: query.isEmpty ? "megaphone" : "magnifyingglass",
+                    title: query.isEmpty ? "Brak ogłoszeń" : "Nic nie znaleziono",
+                    message: query.isEmpty ? nil : "Brak ogłoszeń pasujących do „\(query)”."
+                )
             }
-            ForEach(repo.announcements) { item in
+            ForEach(visible) { item in
                 let read = repo.isAnnouncementRead(item)
                 NavigationLink {
                     AnnouncementDetailView(item: item)
@@ -48,6 +66,7 @@ struct AnnouncementsView: View {
         .scrollContentBackground(.hidden)
         .background(Color.appGroupedBackground.ignoresSafeArea())
         .navigationTitle("Ogłoszenia")
+        .searchable(text: $search, prompt: "Temat, treść lub autor")
         .refreshable { await repo.refreshCore() }
         .task { await repo.refreshCoreIfStale() }
     }

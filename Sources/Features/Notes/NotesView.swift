@@ -2,13 +2,31 @@ import SwiftUI
 
 struct NotesView: View {
     @Environment(DataRepository.self) private var repo
+    @State private var search = ""
+
+    private var query: String {
+        search.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var visible: [NoteItem] {
+        guard !query.isEmpty else { return repo.notes }
+        return repo.notes.filter {
+            $0.text.localizedCaseInsensitiveContains(query)
+                || ($0.category?.localizedCaseInsensitiveContains(query) ?? false)
+                || ($0.teacher?.localizedCaseInsensitiveContains(query) ?? false)
+        }
+    }
 
     var body: some View {
         List {
-            if repo.notes.isEmpty {
-                EmptyStateView(systemImage: "exclamationmark.bubble", title: "Brak uwag")
+            if visible.isEmpty {
+                EmptyStateView(
+                    systemImage: query.isEmpty ? "exclamationmark.bubble" : "magnifyingglass",
+                    title: query.isEmpty ? "Brak uwag" : "Nic nie znaleziono",
+                    message: query.isEmpty ? nil : "Brak uwag pasujących do „\(query)”."
+                )
             }
-            ForEach(repo.notes) { note in
+            ForEach(visible) { note in
                 HStack(alignment: .top, spacing: Theme.Space.md) {
                     Image(systemName: icon(for: note.kind))
                         .font(.footnote.weight(.semibold))
@@ -39,6 +57,7 @@ struct NotesView: View {
         .scrollContentBackground(.hidden)
         .background(Color.appGroupedBackground.ignoresSafeArea())
         .navigationTitle("Uwagi")
+        .searchable(text: $search, prompt: "Treść, kategoria, nauczyciel")
         .refreshable { await repo.refreshCore() }
         .task { await repo.refreshCoreIfStale() }
     }

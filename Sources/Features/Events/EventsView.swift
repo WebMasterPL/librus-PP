@@ -3,9 +3,21 @@ import SwiftUI
 struct EventsView: View {
     @Environment(DataRepository.self) private var repo
     @State private var showPast = false
+    @State private var search = ""
+
+    private var query: String {
+        search.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 
     private var visible: [CalendarEvent] {
-        showPast ? repo.events : repo.events.filter { !$0.isPast }
+        let base = showPast ? repo.events : repo.events.filter { !$0.isPast }
+        guard !query.isEmpty else { return base }
+        return base.filter {
+            $0.content.localizedCaseInsensitiveContains(query)
+                || ($0.category?.localizedCaseInsensitiveContains(query) ?? false)
+                || ($0.subject?.localizedCaseInsensitiveContains(query) ?? false)
+                || ($0.teacher?.localizedCaseInsensitiveContains(query) ?? false)
+        }
     }
 
     private var grouped: [(key: String, items: [CalendarEvent])] {
@@ -24,13 +36,18 @@ struct EventsView: View {
         return rows
     }
 
+    private var emptyMessage: String? {
+        if !query.isEmpty { return "Brak wpisów pasujących do „\(query)”." }
+        if repo.events.isEmpty { return nil }
+        return "Włącz „Pokaż minione”, aby zobaczyć starsze wpisy."
+    }
+
     var body: some View {
         List {
-            if repo.events.isEmpty {
-                EmptyStateView(systemImage: "calendar.badge.clock", title: "Brak wpisów w terminarzu")
-            }
-            if !repo.events.isEmpty {
-                Toggle("Pokaż minione", isOn: $showPast.animation(Theme.Motion.quick))
+            if visible.isEmpty {
+                EmptyStateView(systemImage: query.isEmpty ? "calendar.badge.clock" : "magnifyingglass",
+                               title: query.isEmpty ? "Brak wpisów w terminarzu" : "Nic nie znaleziono",
+                               message: emptyMessage)
             }
 
             ForEach(grouped, id: \.key) { group in
@@ -65,6 +82,18 @@ struct EventsView: View {
         .scrollContentBackground(.hidden)
         .background(Color.appGroupedBackground.ignoresSafeArea())
         .navigationTitle("Terminarz")
+        .searchable(text: $search, prompt: "Opis, kategoria, przedmiot")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Toggle("Pokaż minione", isOn: $showPast.animation(Theme.Motion.quick))
+                } label: {
+                    Label("Filtr", systemImage: showPast
+                          ? "line.3.horizontal.decrease.circle.fill"
+                          : "line.3.horizontal.decrease.circle")
+                }
+            }
+        }
         .refreshable { await repo.refreshCore() }
         .task { await repo.refreshCoreIfStale() }
     }

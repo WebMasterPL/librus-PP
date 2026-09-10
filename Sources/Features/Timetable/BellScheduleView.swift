@@ -19,11 +19,14 @@ struct BellScheduleView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     Card(padding: Theme.Space.md) {
-                        VStack(spacing: 0) {
-                            ForEach(Array(repo.bellSchedule.enumerated()), id: \.element.id) { idx, period in
-                                periodRow(period)
-                                if idx < repo.bellSchedule.count - 1 {
-                                    Divider().padding(.leading, 40).opacity(0.4)
+                        // Minute tick so the "teraz" badge moves down the list on its own.
+                        TimelineView(.everyMinute) { _ in
+                            VStack(spacing: 0) {
+                                ForEach(Array(repo.bellSchedule.enumerated()), id: \.element.id) { idx, period in
+                                    periodRow(period)
+                                    if idx < repo.bellSchedule.count - 1 {
+                                        Divider().padding(.leading, 40).opacity(0.4)
+                                    }
                                 }
                             }
                         }
