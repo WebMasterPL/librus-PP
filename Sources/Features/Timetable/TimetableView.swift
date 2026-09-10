@@ -99,6 +99,8 @@ struct TimetableView: View {
                 Image(systemName: "chevron.left").font(.body.weight(.semibold))
             }
             .frame(width: 44, height: 44)
+            .glassControlStyle()
+            .accessibilityLabel("Poprzedni tydzień")
 
             Spacer()
             VStack(spacing: 1) {
@@ -114,6 +116,8 @@ struct TimetableView: View {
                 Image(systemName: "chevron.right").font(.body.weight(.semibold))
             }
             .frame(width: 44, height: 44)
+            .glassControlStyle()
+            .accessibilityLabel("Następny tydzień")
         }
         .padding(.horizontal, Theme.Space.sm)
         .padding(.vertical, Theme.Space.xs)

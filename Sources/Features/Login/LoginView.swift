@@ -84,7 +84,7 @@ struct LoginView: View {
                 }
                 .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderedProminent)
+            .primaryActionStyle()
             .controlSize(.large)
             .disabled(login.isEmpty || password.isEmpty || app.isLoggingIn)
 

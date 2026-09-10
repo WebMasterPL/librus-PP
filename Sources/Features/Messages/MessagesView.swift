@@ -270,7 +270,7 @@ struct MessageReplyView: View {
                 }
             }
             .overlay {
-                if sending { ProgressView("Wysyłanie…").padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12)) }
+                if sending { ProgressView("Wysyłanie…").padding().glassPanel(cornerRadius: 12) }
             }
             .confirmationDialog(
                 "Wysłać wiadomość do: \(recipientName)?",

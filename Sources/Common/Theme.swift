@@ -98,6 +98,52 @@ extension View {
     }
 }
 
+// MARK: - Liquid Glass (iOS 26) with pre-26 fallbacks
+//
+// Deployment target is still iOS 17, so every glass API lives behind an
+// availability check with the closest older equivalent as the fallback. Glass is
+// for floating controls and overlays — content surfaces (Card, StatTile) stay
+// opaque on purpose.
+
+extension View {
+    /// The screen's primary action. Glass on iOS 26, bordered-prominent before it.
+    @ViewBuilder func primaryActionStyle() -> some View {
+        if #available(iOS 26.0, *) {
+            buttonStyle(.glassProminent)
+        } else {
+            buttonStyle(.borderedProminent)
+        }
+    }
+
+    /// A secondary floating control (week chevrons, toolbar actions). Pre-26 the
+    /// view is left exactly as it was — the old look is the intended fallback.
+    @ViewBuilder func glassControlStyle() -> some View {
+        if #available(iOS 26.0, *) {
+            buttonStyle(.glass)
+        } else {
+            self
+        }
+    }
+
+    /// Floating panel over content — progress overlays and the like.
+    @ViewBuilder func glassPanel(cornerRadius: CGFloat = Theme.Radius.md) -> some View {
+        if #available(iOS 26.0, *) {
+            glassEffect(.regular, in: .rect(cornerRadius: cornerRadius))
+        } else {
+            background(.regularMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        }
+    }
+
+    /// Lets the tab bar shrink out of the way while reading long lists (iOS 26).
+    @ViewBuilder func minimizingTabBar() -> some View {
+        if #available(iOS 26.0, *) {
+            tabBarMinimizeBehavior(.onScrollDown)
+        } else {
+            self
+        }
+    }
+}
+
 // MARK: - Haptics
 
 enum Haptics {

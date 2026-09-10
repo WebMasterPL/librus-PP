@@ -92,7 +92,7 @@ struct MessageComposeView: View {
                 if sending {
                     ProgressView("Wysyłanie…")
                         .padding()
-                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
+                        .glassPanel()
                 }
             }
             .confirmationDialog("Wysłać wiadomość?", isPresented: $confirm, titleVisibility: .visible) {

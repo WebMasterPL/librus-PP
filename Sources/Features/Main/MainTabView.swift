@@ -22,6 +22,7 @@ struct MainTabView: View {
             MoreTab()
                 .tabItem { Label("Więcej", systemImage: "ellipsis.circle.fill") }
         }
+        .minimizingTabBar()
     }
 }
 
