@@ -32,6 +32,7 @@ przez **SideStore / AltStore** darmowym Apple ID.
 | Logowanie | `portal.librus.pl` OAuth → `api/v3/SynergiaAccounts` → Bearer per konto |
 | Ustawienia → **Diagnostyka połączenia** — test każdego endpointu + kopiuj raport | — |
 | Powiadomienia (osobno: oceny / zmiany w planie / wiadomości), *eksperymentalne* | `BGAppRefreshTask` |
+| Ustawienia → **Dodawaj wpisy do Kalendarza** — terminarz w systemowym Kalendarzu | `EventKit` |
 
 Nowe oceny są oznaczane plakietką „NOWE" + liczbą na zakładce (lokalne śledzenie, działa
 zawsze, niezależnie od powiadomień w tle). Chwilowy błąd jednego endpointu nie czyści
@@ -75,6 +76,9 @@ na telefonie w SideStore. Żeby użyć własnego repo: zmień URL-e w `apps.json
 ## Prywatność
 
 - Dane logowania i tokeny: **tylko Keychain urządzenia**. Nigdzie nie są wysyłane poza `*.librus.pl`.
+- Kalendarz: synchronizacja jest **domyślnie wyłączona**. Po włączeniu aplikacja tworzy własny
+  kalendarz „Librus Plus" i zapisuje wyłącznie w nim — Twoich wydarzeń nie czyta ani nie zmienia.
+  Wyłączenie opcji zostawia kalendarz; osobny przycisk kasuje go razem z wpisami.
 - Zero analityki, zero zewnętrznych SDK, zero serwera pośredniczącego.
 - Wiadomości: aplikacja czyta stronę `synergia.librus.pl/wiadomosci` jako Twoja przeglądarka
   (sesja web Synergii). Nic nie przechodzi przez nikogo trzeciego.

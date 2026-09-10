@@ -199,9 +199,18 @@ final class DataRepository {
             // Sideload can't rely on the background task firing — also surface new
             // grades / timetable changes / messages as notifications on open.
             await BackgroundRefresh.runForegroundChecksIfDue(session: session)
+            await syncCalendarIfEnabled()
         } catch {
             handle(error, into: \.lastError)
         }
+    }
+
+    /// Mirror the freshly-fetched Terminarz into the system Calendar. Idempotent —
+    /// an unchanged entry is not re-saved, so running it after every refresh is cheap.
+    @discardableResult
+    func syncCalendarIfEnabled() async -> CalendarSync.SyncResult? {
+        guard CalendarSync.isEnabled else { return nil }
+        return await CalendarSync.sync(events: events, bellSchedule: bellSchedule)
     }
 
     /// Refresh only when the last successful sync is older than `maxAge`. Used when

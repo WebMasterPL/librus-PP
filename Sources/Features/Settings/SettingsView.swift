@@ -5,10 +5,21 @@ struct SettingsView: View {
     @Environment(DataRepository.self) private var repo
 
     @State private var showLogoutConfirm = false
-    @State private var testNotificationMessage: String?
+    @State private var confirmCalendarRemoval = false
+    @State private var notice: Notice?
+    @State private var isSyncingCalendar = false
     @AppStorage(BackgroundRefresh.Keys.grades) private var notifyNewGrades = false
     @AppStorage(BackgroundRefresh.Keys.timetable) private var notifyTimetable = false
     @AppStorage(BackgroundRefresh.Keys.messages) private var notifyMessages = false
+    @AppStorage(CalendarSync.enabledKey) private var syncCalendar = false
+
+    /// One alert slot shared by every informational message on this screen —
+    /// stacking several `.alert`s on one view fights over the presentation.
+    private struct Notice: Identifiable {
+        let id = UUID()
+        let title: String
+        let message: String
+    }
 
     private var version: String {
         let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
@@ -65,17 +76,18 @@ struct SettingsView: View {
                 if notifyNewGrades || notifyTimetable || notifyMessages {
                     Button {
                         Task {
+                            let text: String
                             switch await NotificationManager.sendTestNotification() {
                             case .scheduled:
-                                testNotificationMessage = "Wysłane. Powiadomienie powinno pojawić się za chwilę. "
-                                    + "Jeśli nie przychodzi — sprawdź Ustawienia iOS → Powiadomienia → Librus Plus. "
-                                    + "W LiveContainer / sideloadzie powiadomienia często nie działają wcale."
+                                text = "Wysłane. Powiadomienie powinno pojawić się za chwilę. "
+                                    + "Jeśli nie przychodzi — sprawdź Ustawienia iOS → Powiadomienia → Librus Plus."
                             case .denied:
-                                testNotificationMessage = "Powiadomienia są wyłączone dla aplikacji. "
+                                text = "Powiadomienia są wyłączone dla aplikacji. "
                                     + "Włącz je w Ustawieniach iOS → Powiadomienia → Librus Plus."
                             case .failed(let detail):
-                                testNotificationMessage = "System odrzucił powiadomienie: \(detail)"
+                                text = "System odrzucił powiadomienie: \(detail)"
                             }
+                            notice = Notice(title: "Powiadomienie testowe", message: text)
                         }
                     } label: {
                         Label("Wyślij powiadomienie testowe", systemImage: "paperplane")
@@ -85,6 +97,34 @@ struct SettingsView: View {
                 Text("Powiadomienia")
             } footer: {
                 Text("Eksperymentalne. iOS sam decyduje, kiedy odświeżyć aplikację w tle — dla apek sideloadowanych bywa to rzadko. Plakietki „nowe” w aplikacji działają zawsze.")
+            }
+
+            Section {
+                Toggle(isOn: $syncCalendar) {
+                    Label("Dodawaj wpisy do Kalendarza", systemImage: "calendar.badge.plus")
+                }
+                if syncCalendar {
+                    Button {
+                        Task { await syncCalendarNow() }
+                    } label: {
+                        HStack {
+                            Label("Synchronizuj teraz", systemImage: "arrow.triangle.2.circlepath")
+                            Spacer()
+                            if isSyncingCalendar { ProgressView() }
+                        }
+                    }
+                    .disabled(isSyncingCalendar)
+
+                    Button(role: .destructive) {
+                        confirmCalendarRemoval = true
+                    } label: {
+                        Label("Usuń kalendarz „\(CalendarSync.calendarTitle)”", systemImage: "trash")
+                    }
+                }
+            } header: {
+                Text("Kalendarz")
+            } footer: {
+                Text("Wpisy z terminarza trafiają do osobnego kalendarza „\(CalendarSync.calendarTitle)” i odświeżają się przy każdej synchronizacji — zmieniony wpis jest aktualizowany, usunięty znika. Twoje własne wydarzenia nie są odczytywane ani zmieniane.")
             }
 
             Section {
@@ -124,22 +164,82 @@ struct SettingsView: View {
         .onChange(of: notifyNewGrades) { _, on in handleToggle(on) { notifyNewGrades = false } }
         .onChange(of: notifyTimetable) { _, on in handleToggle(on) { notifyTimetable = false } }
         .onChange(of: notifyMessages) { _, on in handleToggle(on) { notifyMessages = false } }
+        .onChange(of: syncCalendar) { _, on in handleCalendarToggle(on) }
         .confirmationDialog("Wylogować się?", isPresented: $showLogoutConfirm, titleVisibility: .visible) {
             Button("Wyloguj", role: .destructive) {
                 Task { await app.logOut() }
             }
             Button("Anuluj", role: .cancel) {}
         }
-        .alert("Powiadomienie testowe", isPresented: Binding(
-            get: { testNotificationMessage != nil },
-            set: { if !$0 { testNotificationMessage = nil } }
-        ), presenting: testNotificationMessage) { _ in
+        .confirmationDialog(
+            "Usunąć kalendarz „\(CalendarSync.calendarTitle)”?",
+            isPresented: $confirmCalendarRemoval, titleVisibility: .visible
+        ) {
+            Button("Usuń kalendarz", role: .destructive) {
+                CalendarSync.removeMirrorCalendar()
+                syncCalendar = false
+                notice = Notice(title: "Kalendarz usunięty",
+                                message: "Wpisy z terminarza zniknęły z aplikacji Kalendarz.")
+            }
+            Button("Anuluj", role: .cancel) {}
+        } message: {
+            Text("Zniknie razem ze wszystkimi wpisami, które tam dodaliśmy. Twoje własne wydarzenia zostaną nietknięte.")
+        }
+        .alert(notice?.title ?? "", isPresented: Binding(
+            get: { notice != nil },
+            set: { if !$0 { notice = nil } }
+        ), presenting: notice) { _ in
             Button("OK", role: .cancel) {}
-        } message: { Text($0) }
+        } message: { Text($0.message) }
     }
 
     private var currentLogin: String? {
         Credentials.load()?.login
+    }
+
+    /// Turning the mirror on asks for Calendar access and does a first pass right
+    /// away, so the user sees the entries land instead of waiting for a refresh.
+    private func handleCalendarToggle(_ turnedOn: Bool) {
+        Haptics.selection()
+        guard turnedOn else { return }
+        Task {
+            guard await CalendarSync.requestAccess() else {
+                Haptics.warning()
+                syncCalendar = false
+                notice = Notice(
+                    title: "Brak dostępu do Kalendarza",
+                    message: "Włącz go w Ustawieniach iOS → Prywatność i bezpieczeństwo → Kalendarze → Librus Plus."
+                )
+                return
+            }
+            await syncCalendarNow()
+        }
+    }
+
+    private func syncCalendarNow() async {
+        isSyncingCalendar = true
+        defer { isSyncingCalendar = false }
+        guard let result = await repo.syncCalendarIfEnabled() else { return }
+
+        switch result {
+        case .synced(let added, let updated, let removed):
+            Haptics.success()
+            notice = Notice(
+                title: "Kalendarz zsynchronizowany",
+                message: added + updated + removed == 0
+                    ? "Wszystko było już aktualne."
+                    : "Dodane: \(added), zaktualizowane: \(updated), usunięte: \(removed)."
+            )
+        case .denied:
+            Haptics.warning()
+            notice = Notice(
+                title: "Brak dostępu do Kalendarza",
+                message: "Włącz go w Ustawieniach iOS → Prywatność i bezpieczeństwo → Kalendarze → Librus Plus."
+            )
+        case .failed(let detail):
+            Haptics.warning()
+            notice = Notice(title: "Nie udało się zsynchronizować", message: detail)
+        }
     }
 
     /// Shared handler for the three notification toggles: ask for permission when

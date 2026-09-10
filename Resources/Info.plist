@@ -24,6 +24,8 @@
 	<true/>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Aby dodawać wpisy z terminarza Librusa do osobnego kalendarza „Librus Plus”, aplikacja musi móc go tworzyć i aktualizować. Twoje własne wydarzenia nie są odczytywane ani zmieniane.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>
