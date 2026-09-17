@@ -49,6 +49,14 @@ enum GradeMath {
         return String(format: "%.2f", value)
     }
 
+    /// Trimmed formatting for a point-grade value/max (e.g. "9", not "9.00") —
+    /// unlike the 1-6 scale, whole numbers are the common case here.
+    static func formatPoint(_ value: Double?) -> String {
+        guard let value else { return "—" }
+        if value.truncatingRemainder(dividingBy: 1) == 0 { return String(Int(value)) }
+        return String(format: "%.1f", value)
+    }
+
     struct HypotheticalGrade: Identifiable, Hashable {
         let id = UUID()
         var value: Double

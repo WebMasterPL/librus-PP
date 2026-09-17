@@ -140,7 +140,7 @@ struct GradeRow: View {
 
     var body: some View {
         HStack(spacing: Theme.Space.md) {
-            Pill(text: grade.raw, color: gradeColor(for: grade.value))
+            Pill(text: grade.raw, color: gradeColor(for: grade.colorValue))
                 .frame(minWidth: 42)
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: Theme.Space.sm) {
@@ -183,6 +183,7 @@ struct GradeRow: View {
     static func label(for kind: GradeKind) -> String {
         switch kind {
         case .normal: return "Ocena"
+        case .point: return "Ocena punktowa"
         case .semesterProposed: return "Propozycja śródroczna"
         case .semesterFinal: return "Ocena śródroczna"
         case .yearProposed: return "Propozycja roczna"
@@ -200,10 +201,14 @@ struct GradeDetailView: View {
                 HStack {
                     Text("Ocena").foregroundStyle(.secondary)
                     Spacer()
-                    Pill(text: grade.raw, color: gradeColor(for: grade.value))
+                    Pill(text: grade.raw, color: gradeColor(for: grade.colorValue))
                         .scaleEffect(1.15)
                 }
-                if let value = grade.value { KeyValueRow(key: "Wartość", value: GradeMath.format(value)) }
+                if let value = grade.value {
+                    KeyValueRow(key: "Wartość", value: grade.pointMax != nil
+                        ? "\(GradeMath.formatPoint(value)) / \(GradeMath.formatPoint(grade.pointMax))"
+                        : GradeMath.format(value))
+                }
                 if grade.weight > 0 { KeyValueRow(key: "Waga", value: GradeMath.format(grade.weight)) }
                 KeyValueRow(key: "Liczona do średniej", value: grade.countsToAverage ? "Tak" : "Nie")
                 KeyValueRow(key: "Rodzaj", value: GradeRow.label(for: grade.kind))

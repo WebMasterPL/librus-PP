@@ -22,6 +22,36 @@ final class DecodingTests: XCTestCase {
         XCTAssertTrue(resp.grades[1].isSemesterProposition)
     }
 
+    /// The alternate points-based scale (e.g. "9/10") some schools use instead
+    /// of, or alongside, the standard 1-6 one.
+    func testDecodePointGrades() throws {
+        let json = """
+        { "Grades": [
+          { "Id": 500, "Grade": "9", "GradeValue": 9, "AddDate": "2026-09-15 10:00:00",
+            "Semester": 1, "Category": { "Id": 30 }, "AddedBy": { "Id": 20 },
+            "Subject": { "Id": 3 } }
+        ] }
+        """
+        let resp = try decoder.decode(RawPointGradesResponse.self, from: Data(json.utf8))
+        XCTAssertEqual(resp.grades.count, 1)
+        XCTAssertEqual(resp.grades[0].grade, "9")
+        XCTAssertEqual(resp.grades[0].gradeValue, 9)
+        XCTAssertEqual(resp.grades[0].category?.id, 30)
+    }
+
+    func testDecodePointGradeCategories() throws {
+        let json = """
+        { "Categories": [
+          { "Id": 30, "Name": "sprawdzian", "CountToTheAverage": true, "Weight": 4,
+            "ValueFrom": 0, "ValueTo": 10 }
+        ] }
+        """
+        let resp = try decoder.decode(RawPointGradeCategoriesResponse.self, from: Data(json.utf8))
+        XCTAssertEqual(resp.categories.count, 1)
+        XCTAssertEqual(resp.categories[0].valueTo, 10)
+        XCTAssertEqual(resp.categories[0].effectiveWeight, 4)
+    }
+
     func testDecodeTimetableNesting() throws {
         let json = """
         { "Timetable": { "2026-09-01": [

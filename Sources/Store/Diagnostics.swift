@@ -21,6 +21,8 @@ struct Diagnostics {
             ("Classrooms", Librus.Path.classrooms),
             ("Grades", Librus.Path.grades),
             ("Grades/Categories", Librus.Path.gradeCategories),
+            ("PointGrades", Librus.Path.pointGrades),
+            ("PointGrades/Categories", Librus.Path.pointGradeCategories),
             ("Timetables", Librus.Path.timetable(weekStart: LibrusDate.ymdString(LibrusDate.weekStart()))),
             ("Attendances", Librus.Path.attendances),
             ("Attendances/Types", Librus.Path.attendanceTypes),

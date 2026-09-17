@@ -43,6 +43,7 @@ final class DataRepository {
     @ObservationIgnored private var rawSubjects: [RawSubject] = []
     @ObservationIgnored private var rawUsers: [RawUser] = []
     @ObservationIgnored private var rawCategories: [RawGradeCategory] = []
+    @ObservationIgnored private var rawPointCategories: [RawPointGradeCategory] = []
     @ObservationIgnored private var rawComments: [RawGradeComment] = []
     @ObservationIgnored private var rawLessons: [RawLessonDef] = []
     @ObservationIgnored private var rawAttTypes: [RawAttendanceType] = []
@@ -260,6 +261,8 @@ final class DataRepository {
             async let categoriesT = api.gradeCategories()
             async let commentsT = api.gradeComments()
             async let gradesT = api.grades()
+            async let pointCategoriesT = api.pointGradeCategories()
+            async let pointGradesT = api.pointGrades()
             async let lessonsT = api.lessons()
             async let attTypesT = api.attendanceTypes()
             async let attsT = api.attendances()
@@ -279,6 +282,7 @@ final class DataRepository {
             if let v = await usersT { rawUsers = v }
             if let v = await categoriesT { rawCategories = v }
             if let v = await commentsT { rawComments = v }
+            if let v = await pointCategoriesT { rawPointCategories = v }
             if let v = await lessonsT { rawLessons = v }
             if let v = await attTypesT { rawAttTypes = v }
             if let v = await noteCategoriesT { rawNoteCats = v }
@@ -292,6 +296,7 @@ final class DataRepository {
             let subjectByID = Dictionary(rawSubjects.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
             let userByID = Dictionary(rawUsers.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
             let categoryByID = Dictionary(rawCategories.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+            let pointCategoryByID = Dictionary(rawPointCategories.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
             let commentByID = Dictionary(rawComments.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
             let lessonByID = Dictionary(rawLessons.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
             let attTypeByID = Dictionary(rawAttTypes.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
@@ -322,10 +327,16 @@ final class DataRepository {
                 }.sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
             }
 
-            if let grades = await gradesT {
+            let grades = await gradesT
+            let pointGrades = await pointGradesT
+            // Either endpoint alone is enough to show something — a school may
+            // have only one of the two scales enabled (or one may briefly blip).
+            if grades != nil || pointGrades != nil {
                 subjectGrades = Self.joinGrades(
-                    grades, subjectByID: subjectByID, userByID: userByID,
-                    categoryByID: categoryByID, commentByID: commentByID
+                    grades ?? [], pointGrades: pointGrades ?? [],
+                    subjectByID: subjectByID, userByID: userByID,
+                    categoryByID: categoryByID, commentByID: commentByID,
+                    pointCategoryByID: pointCategoryByID
                 )
                 if !SeenGrades.hasBaseline {
                     SeenGrades.establishBaseline(allGradeIDs)
@@ -561,10 +572,12 @@ final class DataRepository {
 
     private static func joinGrades(
         _ grades: [RawGrade],
+        pointGrades: [RawPointGrade] = [],
         subjectByID: [Int: RawSubject],
         userByID: [Int: RawUser],
         categoryByID: [Int: RawGradeCategory],
-        commentByID: [Int: RawGradeComment]
+        commentByID: [Int: RawGradeComment],
+        pointCategoryByID: [Int: RawPointGradeCategory] = [:]
     ) -> [SubjectGrades] {
         var bySubject: [Int: SubjectGrades] = [:]
         for g in grades {
@@ -600,6 +613,32 @@ final class DataRepository {
             bySubject[subjId, default: SubjectGrades(subjectId: subjId, subjectName: subjName, grades: [])]
                 .grades.append(item)
         }
+
+        for g in pointGrades {
+            let subjId = g.subject?.id ?? -1
+            let subjName = subjectByID[subjId]?.name ?? "Inne"
+            let category = g.category.flatMap { pointCategoryByID[$0.id] }
+            let max = category?.valueTo
+            let value = g.gradeValue
+
+            let raw: String = {
+                guard let value, let max, max > 0 else { return g.grade }
+                return "\(GradeMath.formatPoint(value))/\(GradeMath.formatPoint(max))"
+            }()
+
+            let item = GradeItem(
+                id: -g.id, raw: raw, value: value, weight: category?.effectiveWeight ?? 0,
+                semester: g.semester, kind: .point,
+                categoryName: category?.name ?? "",
+                teacherName: g.addedBy.flatMap { userByID[$0.id]?.displayName } ?? "",
+                subjectId: subjId, subjectName: subjName,
+                date: LibrusDate.fromISO(g.addDate),
+                comment: nil, pointMax: max
+            )
+            bySubject[subjId, default: SubjectGrades(subjectId: subjId, subjectName: subjName, grades: [])]
+                .grades.append(item)
+        }
+
         return bySubject.values
             .map { var s = $0; s.grades.sort { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }; return s }
             .sorted { $0.subjectName.localizedCaseInsensitiveCompare($1.subjectName) == .orderedAscending }

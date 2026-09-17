@@ -87,23 +87,26 @@ enum BackgroundRefresh {
 
     // MARK: - Grades
 
-    /// Fetch grades, notify about any not yet seen, then mark them seen.
+    /// Fetch grades (both the 1-6 and point scales), notify about any not yet
+    /// seen, then mark them seen.
     static func runGradeCheck(session: LibrusSession) async {
         guard UserDefaults.standard.bool(forKey: Keys.grades), SeenGrades.hasBaseline else { return }
         let api = LibrusAPI(session: session)
 
-        guard let rawGrades = await api.grades() else { return }
+        let rawGrades = await api.grades()
+        let rawPointGrades = await api.pointGrades()
+        guard rawGrades != nil || rawPointGrades != nil else { return }
 
         var subjectByID: [Int: RawSubject] = [:]
         if let subjects = await api.subjects() {
             subjectByID = Dictionary(subjects.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         }
 
-        let allIDs = Set(rawGrades.map(\.id))
+        let allIDs = Set((rawGrades ?? []).map(\.id) + (rawPointGrades ?? []).map { -$0.id })
         let newIDs = SeenGrades.newIDs(in: allIDs)
         guard !newIDs.isEmpty else { return }
 
-        let newGrades: [GradeItem] = rawGrades
+        let newGrades: [GradeItem] = (rawGrades ?? [])
             .filter { newIDs.contains($0.id) }
             .map { g in
                 GradeItem(
@@ -114,8 +117,19 @@ enum BackgroundRefresh {
                     date: nil, comment: nil
                 )
             }
+        let newPointGrades: [GradeItem] = (rawPointGrades ?? [])
+            .filter { newIDs.contains(-$0.id) }
+            .map { g in
+                GradeItem(
+                    id: -g.id, raw: g.grade, value: g.gradeValue,
+                    weight: 0, semester: g.semester, kind: .point, categoryName: "",
+                    teacherName: "", subjectId: g.subject?.id ?? -1,
+                    subjectName: g.subject.flatMap { subjectByID[$0.id]?.name } ?? "przedmiot",
+                    date: nil, comment: nil
+                )
+            }
 
-        await NotificationManager.notifyNewGrades(newGrades)
+        await NotificationManager.notifyNewGrades(newGrades + newPointGrades)
         SeenGrades.merge(newIDs)
     }
 

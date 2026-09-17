@@ -6,6 +6,8 @@ import Foundation
 
 enum GradeKind: String, Codable {
     case normal
+    /// A school-configurable alternate scale (e.g. "9/10") — see `pointMax`.
+    case point
     case semesterProposed, semesterFinal
     case yearProposed, yearFinal
 }
@@ -23,8 +25,18 @@ struct GradeItem: Identifiable, Codable, Hashable {
     let subjectName: String
     let date: Date?
     let comment: String?
+    /// Top of the scale for a `.point` grade (e.g. 10 for "9/10"); nil otherwise.
+    var pointMax: Double? = nil
 
     var countsToAverage: Bool { kind == .normal && value != nil && weight > 0 }
+
+    /// `value` on the 1-6 scale `gradeColor` expects — a `.point` grade is
+    /// rescaled by its own max first so a "9/10" doesn't get miscoloured as an
+    /// off-the-charts "6".
+    var colorValue: Double? {
+        guard kind == .point, let value, let pointMax, pointMax > 0 else { return value }
+        return 1 + (value / pointMax) * 5
+    }
 }
 
 struct SubjectGrades: Identifiable, Codable, Hashable {

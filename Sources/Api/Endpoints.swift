@@ -52,6 +52,10 @@ enum Librus {
         static let grades = "Grades"
         static let gradeCategories = "Grades/Categories"
         static let gradeComments = "Grades/Comments"
+        /// A school-configurable alternate grading scale (e.g. "9/10") alongside
+        /// the standard 1-6 one — enabled per-school via `Units.GradesSettings`.
+        static let pointGrades = "PointGrades"
+        static let pointGradeCategories = "PointGrades/Categories"
         static let lessons = "Lessons"
         static let attendances = "Attendances"
         static let attendanceTypes = "Attendances/Types"

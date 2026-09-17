@@ -53,6 +53,14 @@ struct LibrusAPI {
         await soft(Librus.Path.gradeComments, as: RawGradeCommentsResponse.self)?.comments
     }
 
+    func pointGrades() async -> [RawPointGrade]? {
+        await soft(Librus.Path.pointGrades, as: RawPointGradesResponse.self)?.grades
+    }
+
+    func pointGradeCategories() async -> [RawPointGradeCategory]? {
+        await soft(Librus.Path.pointGradeCategories, as: RawPointGradeCategoriesResponse.self)?.categories
+    }
+
     func lessons() async -> [RawLessonDef]? {
         await soft(Librus.Path.lessons, as: RawLessonsResponse.self)?.lessons
     }

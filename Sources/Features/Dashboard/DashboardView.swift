@@ -26,7 +26,7 @@ struct DashboardView: View {
 
     private var recentGrades: [GradeItem] {
         repo.subjectGrades.flatMap(\.grades)
-            .filter { $0.kind == .normal }
+            .filter { $0.kind == .normal || $0.kind == .point }
             .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
             .prefix(6).map { $0 }
     }
@@ -237,7 +237,7 @@ struct DashboardView: View {
                 ForEach(recentGrades) { grade in
                     NavigationLink { GradeDetailView(grade: grade) } label: {
                         HStack(spacing: Theme.Space.md) {
-                            Pill(text: grade.raw, color: gradeColor(for: grade.value))
+                            Pill(text: grade.raw, color: gradeColor(for: grade.colorValue))
                                 .frame(minWidth: 40)
                             VStack(alignment: .leading, spacing: 2) {
                                 HStack(spacing: Theme.Space.xs) {
