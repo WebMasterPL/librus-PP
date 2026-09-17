@@ -26,6 +26,14 @@ extension KeyedDecodingContainer {
         if let s = try? decode(String.self, forKey: key) { return Int(s) }
         return nil
     }
+
+    /// `PointGrades.GradeValue` comes back quoted (`"9.00"`), not as a bare
+    /// number — confirmed live 2026-09-17.
+    func decodeFlexDouble(_ key: Key) -> Double? {
+        if let d = try? decode(Double.self, forKey: key) { return d }
+        if let s = try? decode(String.self, forKey: key) { return Double(s) }
+        return nil
+    }
 }
 
 /// String-keyed `CodingKey` for decoding objects with arbitrary keys (dates, ids).

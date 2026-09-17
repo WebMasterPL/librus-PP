@@ -618,25 +618,23 @@ final class DataRepository {
             let subjId = g.subject?.id ?? -1
             let subjName = subjectByID[subjId]?.name ?? "Inne"
             let category = g.category.flatMap { pointCategoryByID[$0.id] }
-            // For a point category, `Weight` doubles as "how many points is this
-            // worth" (per a real user's account — `ValueTo` reportedly reads 0 even
-            // on a populated category) — `ValueTo` is only a fallback for schools
-            // configured the other way round.
+            // Confirmed live: Category.ValueTo is the max points (Weight is an
+            // ordinary, unrelated averaging weight — see RawPointGrades.swift).
             let max: Double? = {
-                if let w = category?.weight, w > 0 { return w }
-                if let v = category?.valueTo, v > 0 { return v }
-                return nil
+                guard let v = category?.valueTo, v > 0 else { return nil }
+                return v
             }()
             let value = g.gradeValue
 
             let raw: String = {
-                guard let value, let max, max > 0 else { return g.grade }
+                guard let value, let max else { return g.grade }
                 return "\(GradeMath.formatPoint(value))/\(GradeMath.formatPoint(max))"
             }()
 
             let item = GradeItem(
-                // `Weight` is being read as the point max above, not an averaging
-                // weight — showing it again as "waga" would just repeat the max.
+                // Weight isn't the point max (see above) and the UI has no other
+                // use for it on a point grade, so it's dropped rather than shown
+                // as a confusing, unrelated "waga" number.
                 id: -g.id, raw: raw, value: value, weight: 0,
                 semester: g.semester, kind: .point,
                 categoryName: category?.name ?? "",

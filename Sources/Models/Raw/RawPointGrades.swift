@@ -28,7 +28,7 @@ struct RawPointGrade: Decodable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = c.decodeFlexInt(.id) ?? -1
         grade = (try? c.decode(String.self, forKey: .grade)) ?? ""
-        gradeValue = try? c.decode(Double.self, forKey: .gradeValue)
+        gradeValue = c.decodeFlexDouble(.gradeValue)
         addDate = try? c.decode(String.self, forKey: .addDate)
         semester = c.decodeFlexInt(.semester) ?? 1
         category = try? c.decode(Ref.self, forKey: .category)
@@ -43,10 +43,11 @@ struct RawPointGradeCategoriesResponse: Decodable {
 }
 
 /// Unlike `Grades/Categories`, each point category also carries a scale.
-/// A real account reported `ValueFrom`/`ValueTo` reading as 0 on a populated
-/// category, with `Weight` holding the actual max points instead (unconfirmed
-/// against the raw JSON) — `DataRepository` prefers `Weight` and only falls
-/// back to `ValueTo` for schools configured the other way round.
+/// Confirmed live (2026-09-17) against a real "9/10" grade: `ValueTo` is the
+/// max points (10 here) and `Weight` is an ordinary, unrelated averaging
+/// weight (real categories show every combination of the two — e.g. `Weight`
+/// 1 with `ValueTo` ranging from 5 to 100) — an earlier guess that `Weight`
+/// doubled as the max was wrong and has been reverted.
 struct RawPointGradeCategory: Decodable {
     let id: Int
     let name: String

@@ -23,19 +23,20 @@ final class DecodingTests: XCTestCase {
     }
 
     /// The alternate points-based scale (e.g. "9/10") some schools use instead
-    /// of, or alongside, the standard 1-6 one.
+    /// of, or alongside, the standard 1-6 one. `GradeValue` is quoted by the
+    /// real API ("9.00", not 9) — confirmed live 2026-09-17.
     func testDecodePointGrades() throws {
         let json = """
         { "Grades": [
-          { "Id": 500, "Grade": "9", "GradeValue": 9, "AddDate": "2026-09-15 10:00:00",
+          { "Id": 500, "Grade": "9.00", "GradeValue": "9.00", "AddDate": "2026-09-15 10:00:00",
             "Semester": 1, "Category": { "Id": 30 }, "AddedBy": { "Id": 20 },
             "Subject": { "Id": 3 } }
         ] }
         """
         let resp = try decoder.decode(RawPointGradesResponse.self, from: Data(json.utf8))
         XCTAssertEqual(resp.grades.count, 1)
-        XCTAssertEqual(resp.grades[0].grade, "9")
-        XCTAssertEqual(resp.grades[0].gradeValue, 9)
+        XCTAssertEqual(resp.grades[0].grade, "9.00")
+        XCTAssertEqual(resp.grades[0].gradeValue, 9.0)
         XCTAssertEqual(resp.grades[0].category?.id, 30)
     }
 
