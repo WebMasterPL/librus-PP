@@ -36,7 +36,7 @@ struct DiagnosticsView: View {
                     fetch: { await Diagnostics(session: app.session).rawGradesJSON() }
                 )
             } footer: {
-                Text("Pełna, niesformatowana odpowiedź Librusa dla wybranego modułu — przydatne przy zgłaszaniu błędów (plan lekcji: ubiegły/bieżący/przyszły tydzień; oceny: Grades + Categories + Comments). Zawiera imiona i nazwiska nauczycieli.")
+                Text("Pełna, niesformatowana odpowiedź Librusa dla wybranego modułu — przydatne przy zgłaszaniu błędów (plan lekcji: ubiegły/bieżący/przyszły tydzień; oceny: Grades + PointGrades + ich kategorie i komentarze). Zawiera imiona i nazwiska nauczycieli.")
             }
 
             if !results.isEmpty {

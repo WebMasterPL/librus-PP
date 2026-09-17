@@ -112,14 +112,17 @@ struct Diagnostics {
         return parts.joined(separator: "\n\n")
     }
 
-    /// Raw (undecoded) JSON for Grades and its two lookup tables — lets us see
-    /// whether `RawGrade`'s typed decode is silently dropping/failing on a shape
-    /// it doesn't expect (the app never surfaces that beyond an empty screen).
+    /// Raw (undecoded) JSON for both the 1-6 and point grade scales and their
+    /// lookup tables — lets us see whether a typed `Raw...` decode is silently
+    /// dropping/failing on a shape it doesn't expect, or whether a field we
+    /// assumed carries a value (e.g. a point category's max) actually doesn't.
     func rawGradesJSON() async -> String {
         let endpoints = [
             ("Grades", Librus.Path.grades),
             ("Grades/Categories", Librus.Path.gradeCategories),
             ("Grades/Comments", Librus.Path.gradeComments),
+            ("PointGrades", Librus.Path.pointGrades),
+            ("PointGrades/Categories", Librus.Path.pointGradeCategories),
         ]
         var parts: [String] = []
         for (name, path) in endpoints {

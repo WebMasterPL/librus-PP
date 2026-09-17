@@ -635,7 +635,9 @@ final class DataRepository {
             }()
 
             let item = GradeItem(
-                id: -g.id, raw: raw, value: value, weight: category?.effectiveWeight ?? 0,
+                // `Weight` is being read as the point max above, not an averaging
+                // weight — showing it again as "waga" would just repeat the max.
+                id: -g.id, raw: raw, value: value, weight: 0,
                 semester: g.semester, kind: .point,
                 categoryName: category?.name ?? "",
                 teacherName: g.addedBy.flatMap { userByID[$0.id]?.displayName } ?? "",
