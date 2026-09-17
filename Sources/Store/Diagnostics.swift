@@ -83,6 +83,19 @@ struct Diagnostics {
         }
     }
 
+    /// Pretty-printed raw JSON for one endpoint — undecoded, so it shows fields
+    /// (or shapes) the typed `Raw...` models don't know about yet.
+    private func rawJSON(name: String, path: String) async -> String {
+        do {
+            let data = try await session.authorizedData(path: path)
+            let obj = try JSONSerialization.jsonObject(with: data)
+            let pretty = try JSONSerialization.data(withJSONObject: obj, options: [.prettyPrinted, .sortedKeys])
+            return "=== \(name) ===\n\(String(data: pretty, encoding: .utf8) ?? "?")"
+        } catch {
+            return "=== \(name) === BŁĄD: \(error)"
+        }
+    }
+
     /// Raw (undecoded) JSON for this week and next — lets us see fields the typed
     /// `RawLesson` model doesn't know about yet, e.g. when a lesson move doesn't
     /// show up the way the decoded model expects.
@@ -92,14 +105,23 @@ struct Diagnostics {
         var parts: [String] = []
         for week in weeks {
             let key = LibrusDate.ymdString(week)
-            do {
-                let data = try await session.authorizedData(path: Librus.Path.timetable(weekStart: key))
-                let obj = try JSONSerialization.jsonObject(with: data)
-                let pretty = try JSONSerialization.data(withJSONObject: obj, options: [.prettyPrinted, .sortedKeys])
-                parts.append("=== \(key) ===\n\(String(data: pretty, encoding: .utf8) ?? "?")")
-            } catch {
-                parts.append("=== \(key) === BŁĄD: \(error)")
-            }
+            parts.append(await rawJSON(name: key, path: Librus.Path.timetable(weekStart: key)))
+        }
+        return parts.joined(separator: "\n\n")
+    }
+
+    /// Raw (undecoded) JSON for Grades and its two lookup tables — lets us see
+    /// whether `RawGrade`'s typed decode is silently dropping/failing on a shape
+    /// it doesn't expect (the app never surfaces that beyond an empty screen).
+    func rawGradesJSON() async -> String {
+        let endpoints = [
+            ("Grades", Librus.Path.grades),
+            ("Grades/Categories", Librus.Path.gradeCategories),
+            ("Grades/Comments", Librus.Path.gradeComments),
+        ]
+        var parts: [String] = []
+        for (name, path) in endpoints {
+            parts.append(await rawJSON(name: name, path: path))
         }
         return parts.joined(separator: "\n\n")
     }

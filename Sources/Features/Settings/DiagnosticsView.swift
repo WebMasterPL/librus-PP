@@ -8,8 +8,6 @@ struct DiagnosticsView: View {
     @State private var results: [DiagnosticResult] = []
     @State private var running = false
     @State private var copied = false
-    @State private var dumpingTimetable = false
-    @State private var timetableCopied = false
 
     var body: some View {
         List {
@@ -29,19 +27,16 @@ struct DiagnosticsView: View {
             }
 
             Section {
-                Button {
-                    Task { await dumpTimetable() }
-                } label: {
-                    HStack {
-                        Label(timetableCopied ? "Skopiowano" : "Kopiuj surowy JSON planu lekcji",
-                              systemImage: timetableCopied ? "checkmark" : "doc.on.doc")
-                        Spacer()
-                        if dumpingTimetable { ProgressView() }
-                    }
-                }
-                .disabled(dumpingTimetable)
+                RawDumpButton(
+                    title: "Kopiuj surowy JSON planu lekcji",
+                    fetch: { await Diagnostics(session: app.session).rawTimetableJSON() }
+                )
+                RawDumpButton(
+                    title: "Kopiuj surowy JSON ocen",
+                    fetch: { await Diagnostics(session: app.session).rawGradesJSON() }
+                )
             } footer: {
-                Text("Pełna, niesformatowana odpowiedź Librusa dla ubiegłego, tego i przyszłego tygodnia — przydatne przy zgłaszaniu błędów planu lekcji (np. przeniesień). Zawiera imiona i nazwiska nauczycieli.")
+                Text("Pełna, niesformatowana odpowiedź Librusa dla wybranego modułu — przydatne przy zgłaszaniu błędów (plan lekcji: ubiegły/bieżący/przyszły tydzień; oceny: Grades + Categories + Comments). Zawiera imiona i nazwiska nauczycieli.")
             }
 
             if !results.isEmpty {
@@ -101,18 +96,42 @@ struct DiagnosticsView: View {
         defer { running = false }
         results = await Diagnostics(session: app.session).run()
     }
+}
 
-    private func dumpTimetable() async {
+/// A button that fetches a raw diagnostic dump on demand and copies it to the
+/// clipboard — local-only and time-limited, same privacy handling as the
+/// connection-test report above.
+private struct RawDumpButton: View {
+    let title: String
+    let fetch: () async -> String
+
+    @State private var running = false
+    @State private var copied = false
+
+    var body: some View {
+        Button {
+            Task { await run() }
+        } label: {
+            HStack {
+                Label(copied ? "Skopiowano" : title, systemImage: copied ? "checkmark" : "doc.on.doc")
+                Spacer()
+                if running { ProgressView() }
+            }
+        }
+        .disabled(running)
+    }
+
+    private func run() async {
         Haptics.tap()
-        dumpingTimetable = true
-        timetableCopied = false
-        defer { dumpingTimetable = false }
-        let json = await Diagnostics(session: app.session).rawTimetableJSON()
+        running = true
+        copied = false
+        defer { running = false }
+        let text = await fetch()
         UIPasteboard.general.setItems(
-            [[UTType.utf8PlainText.identifier: json]],
+            [[UTType.utf8PlainText.identifier: text]],
             options: [.localOnly: true, .expirationDate: Date().addingTimeInterval(10 * 60)]
         )
         Haptics.success()
-        withAnimation(Theme.Motion.quick) { timetableCopied = true }
+        withAnimation(Theme.Motion.quick) { copied = true }
     }
 }
