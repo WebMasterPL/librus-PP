@@ -618,7 +618,15 @@ final class DataRepository {
             let subjId = g.subject?.id ?? -1
             let subjName = subjectByID[subjId]?.name ?? "Inne"
             let category = g.category.flatMap { pointCategoryByID[$0.id] }
-            let max = category?.valueTo
+            // For a point category, `Weight` doubles as "how many points is this
+            // worth" (per a real user's account — `ValueTo` reportedly reads 0 even
+            // on a populated category) — `ValueTo` is only a fallback for schools
+            // configured the other way round.
+            let max: Double? = {
+                if let w = category?.weight, w > 0 { return w }
+                if let v = category?.valueTo, v > 0 { return v }
+                return nil
+            }()
             let value = g.gradeValue
 
             let raw: String = {

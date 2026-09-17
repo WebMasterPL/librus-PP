@@ -42,8 +42,11 @@ struct RawPointGradeCategoriesResponse: Decodable {
     enum CodingKeys: String, CodingKey { case categories = "Categories" }
 }
 
-/// Unlike `Grades/Categories`, each point category also carries the scale's
-/// range (`ValueFrom`…`ValueTo`) — that's where the "/10" in "9/10" comes from.
+/// Unlike `Grades/Categories`, each point category also carries a scale.
+/// A real account reported `ValueFrom`/`ValueTo` reading as 0 on a populated
+/// category, with `Weight` holding the actual max points instead (unconfirmed
+/// against the raw JSON) — `DataRepository` prefers `Weight` and only falls
+/// back to `ValueTo` for schools configured the other way round.
 struct RawPointGradeCategory: Decodable {
     let id: Int
     let name: String
