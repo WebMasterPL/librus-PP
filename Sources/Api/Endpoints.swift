@@ -64,6 +64,10 @@ enum Librus {
         static let events = "HomeWorks"
         static let eventCategories = "HomeWorks/Categories"
         static let classes = "Classes"
+        /// School-wide teacher absences — every teacher, not just this student's
+        /// own. Some schools don't expose this to students/parents; treated as a
+        /// soft, best-effort endpoint like the others.
+        static let teacherFreeDays = "TeacherFreeDays"
         static let notes = "Notes"
         static let noteCategories = "Notes/Categories"
         static let autoLoginToken = "AutoLoginToken"

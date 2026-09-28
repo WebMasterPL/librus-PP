@@ -152,7 +152,7 @@ struct TimetableView: View {
                     }
                 }
 
-                absencesBanner(teacherAbsences(in: day))
+                absencesBanner(dayAbsences(day))
 
                 if day.entries.isEmpty {
                     Text("Brak lekcji").font(.subheadline).foregroundStyle(.secondary)
@@ -195,53 +195,81 @@ struct TimetableView: View {
 
     // MARK: - Teacher absences
 
-    private struct TeacherAbsence: Identifiable {
+    /// One line in the day's absence summary — either a school-wide entry from
+    /// `TeacherFreeDays` (may or may not be one of this student's own teachers)
+    /// or, as a fallback, something the student's own timetable flags that the
+    /// school-wide list didn't cover (the two can lag behind each other).
+    private struct DayAbsence: Identifiable {
         let id: String
-        let lessonNo: Int
-        let subject: String
-        /// The absent teacher — `originalTeacher` for a substitution (`teacher`
-        /// there is the substitute), or `teacher` itself for a plain cancellation
-        /// (nobody replaces it, so it's still the regularly-assigned one).
-        let teacher: String?
-        let isCancelled: Bool
+        let teacherName: String
+        /// Set when this teacher also teaches the student that day.
+        let lessonNo: Int?
+        let subject: String?
+        /// Set for a partial-day absence; nil = the whole day.
+        let timeRange: String?
     }
 
-    /// One line per cancelled or substituted lesson that day, naming the lesson
-    /// it's for — Librus gives no separate "who's absent today" endpoint for a
-    /// student account, so this is derived straight from the day's own entries.
-    private func teacherAbsences(in day: TimetableDay) -> [TeacherAbsence] {
-        day.entries.compactMap { entry in
-            guard entry.isCancelled || entry.isSubstitution else { return nil }
-            return TeacherAbsence(
-                id: entry.id, lessonNo: entry.lessonNo, subject: entry.subject,
-                teacher: entry.isCancelled ? entry.teacher : (entry.originalTeacher ?? entry.teacher),
-                isCancelled: entry.isCancelled
-            )
-        }
-    }
+    /// Librus exposes teacher absences two ways for a student account: the
+    /// school-wide `TeacherFreeDays` list (every teacher, whether or not they
+    /// teach this student) and, per lesson, `IsCanceled`/`IsSubstitutionClass`
+    /// on the student's own timetable. Merge both so nothing only visible in
+    /// one of the two sources gets missed.
+    private func dayAbsences(_ day: TimetableDay) -> [DayAbsence] {
+        var seenTeachers = Set<String>()
+        var out: [DayAbsence] = []
 
-    @ViewBuilder
-    private func absencesBanner(_ absences: [TeacherAbsence]) -> some View {
-        if !absences.isEmpty {
-            VStack(alignment: .leading, spacing: 4) {
-                Label("Nieobecności nauczycieli", systemImage: "person.fill.xmark")
-                    .font(.caption2.weight(.bold))
-                    .foregroundStyle(.secondary)
-                ForEach(absences) { a in
-                    HStack(spacing: 4) {
-                        Image(systemName: a.isCancelled ? "xmark.circle.fill" : "arrow.triangle.2.circlepath")
-                            .font(.caption2)
-                        Text(a.teacher ?? "Nauczyciel").font(.caption2.weight(.semibold))
-                        Text("— lekcja \(a.lessonNo): \(a.subject)")
-                            .font(.caption2).foregroundStyle(.secondary)
-                    }
-                    .foregroundStyle(a.isCancelled ? Color.negative : Color.warning)
-                }
+        for absence in repo.teacherAbsences where absence.includes(day.date) {
+            guard seenTeachers.insert(absence.teacherName).inserted else { continue }
+            let lesson = day.entries.first {
+                ($0.isCancelled && $0.teacher == absence.teacherName)
+                    || ($0.isSubstitution && ($0.originalTeacher ?? $0.teacher) == absence.teacherName)
             }
-            .padding(.horizontal, Theme.Space.sm)
-            .padding(.vertical, Theme.Space.xs)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.warning.opacity(0.08), in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+            out.append(DayAbsence(
+                id: "free-\(absence.id)", teacherName: absence.teacherName,
+                lessonNo: lesson?.lessonNo, subject: lesson?.subject,
+                timeRange: absence.isFullDay ? nil
+                    : [absence.timeFrom, absence.timeTo].compactMap { $0 }.joined(separator: "–")
+            ))
+        }
+
+        for entry in day.entries where entry.isCancelled || entry.isSubstitution {
+            let name = entry.isCancelled ? entry.teacher : (entry.originalTeacher ?? entry.teacher)
+            guard let name, seenTeachers.insert(name).inserted else { continue }
+            out.append(DayAbsence(id: "lesson-\(entry.id)", teacherName: name,
+                                  lessonNo: entry.lessonNo, subject: entry.subject, timeRange: nil))
+        }
+        return out
+    }
+
+    /// Collapsed by default — a day with several absences shouldn't push the
+    /// actual lesson list off-screen; tap to see who and for which lesson.
+    @ViewBuilder
+    private func absencesBanner(_ absences: [DayAbsence]) -> some View {
+        if !absences.isEmpty {
+            DisclosureGroup {
+                VStack(alignment: .leading, spacing: 5) {
+                    ForEach(absences) { a in
+                        HStack(alignment: .firstTextBaseline, spacing: 4) {
+                            Text(a.teacherName).font(.caption2.weight(.semibold))
+                            if let subject = a.subject, let lessonNo = a.lessonNo {
+                                Text("— lekcja \(lessonNo): \(subject)")
+                            } else if let timeRange = a.timeRange {
+                                Text("— \(timeRange)")
+                            } else {
+                                Text("— cały dzień")
+                            }
+                        }
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.top, 3)
+            } label: {
+                Label("Nieobecności nauczycieli (\(absences.count))", systemImage: "person.fill.xmark")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(Color.warning)
+            }
+            .tint(Color.warning)
         }
     }
 }

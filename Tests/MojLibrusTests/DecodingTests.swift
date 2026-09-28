@@ -122,6 +122,24 @@ final class DecodingTests: XCTestCase {
         XCTAssertEqual(lesson.orgClassroom?.name, "12")
     }
 
+    /// School-wide teacher-absence list — independent of this student's own
+    /// timetable, so `Teacher` here can be anyone in the school.
+    func testDecodeTeacherFreeDays() throws {
+        let json = """
+        { "TeacherFreeDays": [
+          { "Id": 42, "Teacher": { "Id": 9 }, "DateFrom": "2026-09-15", "DateTo": "2026-09-15",
+            "TimeFrom": "08:00", "TimeTo": "12:00" },
+          { "Id": 43, "Teacher": { "Id": 11 }, "DateFrom": "2026-09-16", "DateTo": "2026-09-18" }
+        ] }
+        """
+        let resp = try decoder.decode(RawTeacherFreeDaysResponse.self, from: Data(json.utf8))
+        XCTAssertEqual(resp.days.count, 2)
+        XCTAssertEqual(resp.days[0].teacher?.id, 9)
+        XCTAssertEqual(resp.days[0].timeFrom, "08:00")
+        XCTAssertNil(resp.days[1].timeFrom)
+        XCTAssertEqual(resp.days[1].dateTo, "2026-09-18")
+    }
+
     /// `OrgTeacher` — the regularly-assigned (now absent) teacher a substitution
     /// covers for. `Teacher` on the same lesson is the substitute actually
     /// present; both feed the "teacher absences" summary on the timetable.

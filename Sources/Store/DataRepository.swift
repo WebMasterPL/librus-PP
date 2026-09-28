@@ -20,6 +20,9 @@ final class DataRepository {
     var announcements: [AnnouncementItem] = []
     var events: [CalendarEvent] = []
     var notes: [NoteItem] = []
+    /// School-wide, not filtered to this student's own timetable — some schools
+    /// don't expose this at all, in which case it just stays empty.
+    var teacherAbsences: [TeacherAbsence] = []
     var messagesInbox: [MessageItem] = []
     var messagesSent: [MessageItem] = []
     var bellSchedule: [BellPeriod] = []
@@ -100,6 +103,7 @@ final class DataRepository {
         var announcements: [AnnouncementItem]
         var events: [CalendarEvent]?
         var notes: [NoteItem]
+        var teacherAbsences: [TeacherAbsence]?
         var messagesInbox: [MessageItem]
         var messagesSent: [MessageItem]?
         var bellSchedule: [BellPeriod]?
@@ -120,6 +124,7 @@ final class DataRepository {
         announcements = s.announcements
         events = s.events ?? []
         notes = s.notes
+        teacherAbsences = s.teacherAbsences ?? []
         messagesInbox = s.messagesInbox
         messagesSent = s.messagesSent ?? []
         bellSchedule = s.bellSchedule ?? []
@@ -138,7 +143,8 @@ final class DataRepository {
             studentName: studentName, schoolYear: schoolYear,
             subjectGrades: subjectGrades, attendanceSummary: attendanceSummary,
             attendanceItems: attendanceItems, announcements: announcements,
-            events: events, notes: notes, messagesInbox: messagesInbox,
+            events: events, notes: notes, teacherAbsences: teacherAbsences,
+            messagesInbox: messagesInbox,
             messagesSent: messagesSent,
             bellSchedule: bellSchedule, schoolName: schoolName,
             lastSync: lastSync, readAnnouncementIDs: Array(readAnnouncementIDs),
@@ -153,7 +159,8 @@ final class DataRepository {
         Cache.clearAll()
         studentName = ""; schoolYear = .init(); subjectGrades = []
         attendanceSummary = .init(); attendanceItems = []
-        announcements = []; events = []; notes = []; messagesInbox = []; messagesSent = []
+        announcements = []; events = []; notes = []; teacherAbsences = []
+        messagesInbox = []; messagesSent = []
         bellSchedule = []; schoolName = nil
         SeenGrades.reset()
         Seen.timetableChanges.reset()
@@ -272,6 +279,7 @@ final class DataRepository {
             async let noteCategoriesT = api.noteCategories()
             async let eventsT = api.events()
             async let eventCategoriesT = api.eventCategories()
+            async let teacherFreeDaysT = api.teacherFreeDays()
             async let schoolT = api.school()
             async let classroomsT = api.classrooms()
 
@@ -381,6 +389,19 @@ final class DataRepository {
                         time: e.timeFrom
                     )
                 }.sorted { ($0.date ?? .distantFuture) < ($1.date ?? .distantFuture) }
+            }
+
+            if let rawFreeDays = await teacherFreeDaysT {
+                teacherAbsences = rawFreeDays.compactMap { t in
+                    guard let teacherId = t.teacher?.id,
+                          let name = userByID[teacherId]?.displayName, !name.isEmpty,
+                          let from = LibrusDate.fromYMD(t.dateFrom) else { return nil }
+                    return TeacherAbsence(
+                        id: t.id, teacherName: name,
+                        dateFrom: from, dateTo: LibrusDate.fromYMD(t.dateTo) ?? from,
+                        timeFrom: t.timeFrom, timeTo: t.timeTo
+                    )
+                }.sorted { $0.dateFrom < $1.dateFrom }
             }
 
             lastSync = Date()

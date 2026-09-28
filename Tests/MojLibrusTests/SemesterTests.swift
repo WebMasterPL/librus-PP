@@ -28,6 +28,26 @@ final class SemesterTests: XCTestCase {
         XCTAssertTrue(SemesterFilter.all.matches(2, current: 1))
     }
 
+    func testTeacherAbsenceIncludesDateRange() {
+        let single = TeacherAbsence(
+            id: 1, teacherName: "Jan Kowalski",
+            dateFrom: LibrusDate.fromYMD("2026-09-15")!, dateTo: LibrusDate.fromYMD("2026-09-15")!,
+            timeFrom: "08:00", timeTo: "12:00"
+        )
+        XCTAssertFalse(single.isFullDay)
+        XCTAssertTrue(single.includes(LibrusDate.fromYMD("2026-09-15")!))
+        XCTAssertFalse(single.includes(LibrusDate.fromYMD("2026-09-16")!))
+
+        let multiDay = TeacherAbsence(
+            id: 2, teacherName: "Anna Nowak",
+            dateFrom: LibrusDate.fromYMD("2026-09-16")!, dateTo: LibrusDate.fromYMD("2026-09-18")!,
+            timeFrom: nil, timeTo: nil
+        )
+        XCTAssertTrue(multiDay.isFullDay)
+        XCTAssertTrue(multiDay.includes(LibrusDate.fromYMD("2026-09-17")!))
+        XCTAssertFalse(multiDay.includes(LibrusDate.fromYMD("2026-09-19")!))
+    }
+
     func testDecodeClasses() throws {
         let json = """
         { "Class": { "Id": 5, "Number": "3", "Symbol": "A",

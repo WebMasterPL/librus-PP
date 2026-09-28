@@ -208,6 +208,26 @@ struct BellPeriod: Identifiable, Codable, Hashable {
     let end: String
 }
 
+/// A teacher's absence, school-wide (`TeacherFreeDays`) — independent of the
+/// student's own timetable, so it also covers teachers who don't teach them.
+struct TeacherAbsence: Identifiable, Codable, Hashable {
+    let id: Int
+    let teacherName: String
+    let dateFrom: Date
+    let dateTo: Date
+    /// Both nil = absent the whole day.
+    let timeFrom: String?
+    let timeTo: String?
+
+    var isFullDay: Bool { timeFrom == nil && timeTo == nil }
+
+    func includes(_ date: Date) -> Bool {
+        let day = LibrusDate.calendar.startOfDay(for: date)
+        return day >= LibrusDate.calendar.startOfDay(for: dateFrom)
+            && day <= LibrusDate.calendar.startOfDay(for: dateTo)
+    }
+}
+
 // MARK: - Behaviour notes (uwagi)
 
 struct NoteItem: Identifiable, Codable, Hashable {
