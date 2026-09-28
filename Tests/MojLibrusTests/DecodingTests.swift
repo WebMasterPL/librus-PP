@@ -122,6 +122,25 @@ final class DecodingTests: XCTestCase {
         XCTAssertEqual(lesson.orgClassroom?.name, "12")
     }
 
+    /// `OrgTeacher` — the regularly-assigned (now absent) teacher a substitution
+    /// covers for. `Teacher` on the same lesson is the substitute actually
+    /// present; both feed the "teacher absences" summary on the timetable.
+    func testTimetableOrgTeacherForSubstitution() throws {
+        let json = """
+        { "Timetable": { "2026-09-01": [ [ {
+          "LessonNo": 3, "HourFrom": "09:50", "HourTo": "10:35",
+          "Subject": { "Id": 3, "Name": "Matematyka" },
+          "Teacher": { "Id": 11, "FirstName": "Piotr", "LastName": "Zieliński" },
+          "OrgTeacher": { "Id": 9, "FirstName": "Anna", "LastName": "Nowak" },
+          "IsSubstitutionClass": true, "IsCanceled": false
+        } ] ] } }
+        """
+        let resp = try decoder.decode(RawTimetableResponse.self, from: Data(json.utf8))
+        let lesson = try XCTUnwrap(resp.days["2026-09-01"]?.first?.first)
+        XCTAssertEqual(lesson.teacher?.displayName, "Piotr Zieliński")
+        XCTAssertEqual(lesson.orgTeacher?.displayName, "Anna Nowak")
+    }
+
     /// A lesson moved to a different day is still a "substitution" slot as far
     /// as Librus is concerned, but `OrgDate` points back at the original day
     /// rather than matching the slot's own date — that's what distinguishes a

@@ -81,6 +81,10 @@ struct TimetableEntry: Identifiable, Codable, Hashable {
     /// Set only for a substitution lesson moved here from a different day —
     /// i.e. `RawLesson.orgDate` differs from this entry's own day.
     let originalDate: Date?
+    /// The regularly-assigned teacher being covered for — set only when a
+    /// substitution genuinely swapped teachers (`RawLesson.orgTeacher` differs
+    /// from `teacher`). `teacher` above is whoever is actually taking the lesson.
+    let originalTeacher: String?
     let isCancelled: Bool
     let isSubstitution: Bool
     let note: String?

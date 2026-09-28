@@ -152,6 +152,8 @@ struct TimetableView: View {
                     }
                 }
 
+                absencesBanner(teacherAbsences(in: day))
+
                 if day.entries.isEmpty {
                     Text("Brak lekcji").font(.subheadline).foregroundStyle(.secondary)
                         .padding(.vertical, Theme.Space.xs)
@@ -189,6 +191,58 @@ struct TimetableView: View {
         isLoading = true
         defer { isLoading = false }
         await repo.loadTimetable(weekStart: weekStart)
+    }
+
+    // MARK: - Teacher absences
+
+    private struct TeacherAbsence: Identifiable {
+        let id: String
+        let lessonNo: Int
+        let subject: String
+        /// The absent teacher — `originalTeacher` for a substitution (`teacher`
+        /// there is the substitute), or `teacher` itself for a plain cancellation
+        /// (nobody replaces it, so it's still the regularly-assigned one).
+        let teacher: String?
+        let isCancelled: Bool
+    }
+
+    /// One line per cancelled or substituted lesson that day, naming the lesson
+    /// it's for — Librus gives no separate "who's absent today" endpoint for a
+    /// student account, so this is derived straight from the day's own entries.
+    private func teacherAbsences(in day: TimetableDay) -> [TeacherAbsence] {
+        day.entries.compactMap { entry in
+            guard entry.isCancelled || entry.isSubstitution else { return nil }
+            return TeacherAbsence(
+                id: entry.id, lessonNo: entry.lessonNo, subject: entry.subject,
+                teacher: entry.isCancelled ? entry.teacher : (entry.originalTeacher ?? entry.teacher),
+                isCancelled: entry.isCancelled
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func absencesBanner(_ absences: [TeacherAbsence]) -> some View {
+        if !absences.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                Label("Nieobecności nauczycieli", systemImage: "person.fill.xmark")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(.secondary)
+                ForEach(absences) { a in
+                    HStack(spacing: 4) {
+                        Image(systemName: a.isCancelled ? "xmark.circle.fill" : "arrow.triangle.2.circlepath")
+                            .font(.caption2)
+                        Text(a.teacher ?? "Nauczyciel").font(.caption2.weight(.semibold))
+                        Text("— lekcja \(a.lessonNo): \(a.subject)")
+                            .font(.caption2).foregroundStyle(.secondary)
+                    }
+                    .foregroundStyle(a.isCancelled ? Color.negative : Color.warning)
+                }
+            }
+            .padding(.horizontal, Theme.Space.sm)
+            .padding(.vertical, Theme.Space.xs)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.warning.opacity(0.08), in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+        }
     }
 }
 
@@ -323,6 +377,9 @@ struct LessonDetailView: View {
                         if let orgDate = entry.originalDate {
                             KeyValueRow(key: "Pierwotny termin",
                                         value: "\(orgDate.weekdayName.capitalized), \(orgDate.dayMonthYear)")
+                        }
+                        if let originalTeacher = entry.originalTeacher {
+                            KeyValueRow(key: "Zastępstwo za", value: originalTeacher)
                         }
                         if entry.roomChanged {
                             Label("Zmiana sali", systemImage: "arrow.left.arrow.right")

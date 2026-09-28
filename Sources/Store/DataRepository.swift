@@ -696,6 +696,11 @@ final class DataRepository {
         // moved from that day, not a same-day teacher/subject swap.
         let orgDate = LibrusDate.fromYMD(l.orgDate)
         let moved = l.isSubstitution && orgDate != nil && !LibrusDate.isSameDay(orgDate!, date)
+        // The absent, regularly-assigned teacher — only meaningful when a
+        // substitution genuinely swapped who's teaching, not e.g. a room-only change.
+        let orgTeacherName = l.orgTeacher?.displayName
+        let originalTeacher = (l.isSubstitution && orgTeacherName != nil
+            && orgTeacherName != l.teacher?.displayName) ? orgTeacherName : nil
 
         var note: String?
         if l.isCancelled {
@@ -708,7 +713,7 @@ final class DataRepository {
             if let orgName = l.orgSubject?.name, !orgName.isEmpty, orgName != l.subject?.name {
                 parts.append(moved ? "— \(orgName)" : "(było: \(orgName))")
             }
-            if let orgTeacher = l.orgTeacher?.displayName { parts.append(orgTeacher) }
+            if let originalTeacher { parts.append("za: \(originalTeacher)") }
             note = parts.joined(separator: " ")
         }
         return TimetableEntry(
@@ -718,6 +723,7 @@ final class DataRepository {
             classroom: room,
             originalClassroom: orgRoom,
             originalDate: moved ? orgDate : nil,
+            originalTeacher: originalTeacher,
             isCancelled: l.isCancelled,
             isSubstitution: l.isSubstitution,
             note: note
