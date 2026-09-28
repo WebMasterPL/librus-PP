@@ -511,8 +511,13 @@ actor MessagesClient {
         for m in HTTP.allMatches(#"<tr[^>]*>(.*?)</tr>"#, in: scope) {
             guard m.count > 1 else { continue }
             let row = m[1]
+            // A sortable column header ("Nadawca", "Temat", "Data") is a plain `<tr>`
+            // in this table too, and its sort links reuse the same
+            // `/wiadomosci/<folder>/<box>/<id>/…` path with `id=0` — without this
+            // guard it parses as a fake message ("Librus" / "Temat", the column's
+            // own label text taken as the subject).
             guard let idStr = HTTP.firstMatch(#"/wiadomosci/[0-9]+/[0-9]+/([0-9]+?)/"#, in: row),
-                  let id = Int(idStr), seen.insert(id).inserted else { continue }
+                  let id = Int(idStr), id > 0, seen.insert(id).inserted else { continue }
 
             let cellMatches = HTTP.allMatches(#"<td([^>]*)>(.*?)</td>"#, in: row)
             let attrs = cellMatches.map { $0.count > 1 ? $0[1] : "" }
@@ -565,6 +570,9 @@ actor MessagesClient {
 
             sender = Self.cleanCorrespondent(sender)
             if Self.looksLikeHeaderLabel(sender) { sender = "Librus" }
+            // Defense in depth against the same header-row leak as above, for a
+            // layout where the header's sort link happens to carry a non-zero id.
+            guard !Self.looksLikeHeaderLabel(subject) else { continue }
 
             let date = LibrusDate.fromISO(dateStr)
             out.append(MessageItem(

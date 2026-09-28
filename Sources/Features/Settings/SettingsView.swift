@@ -96,7 +96,7 @@ struct SettingsView: View {
             } header: {
                 Text("Powiadomienia")
             } footer: {
-                Text("Eksperymentalne. iOS sam decyduje, kiedy odświeżyć aplikację w tle — dla apek sideloadowanych bywa to rzadko. Plakietki „nowe” w aplikacji działają zawsze.")
+                Text("Eksperymentalne. iOS sam decyduje, kiedy odświeżyć aplikację w tle — dla apek sideloadowanych bywa to rzadko. Plakietki „nowe” w aplikacji działają zawsze. Dla niezawodnych powiadomień dodaj akcję „Odśwież dane Librusa” do automatyzacji w Skrótach (np. codziennie o stałej porze) — aplikacja Skróty → Automatyzacja → Nowa automatyzacja.")
             }
 
             Section {

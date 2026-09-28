@@ -39,6 +39,61 @@ final class MessagesParsingTests: XCTestCase {
         XCTAssertTrue(items.first?.isUnread ?? false) // inline style → unread
     }
 
+    /// Regression: a sortable column-header row ("Nadawca"/"Temat"/"Data") is a
+    /// plain `<tr>` in this table, and its sort links reuse the message-row URL
+    /// pattern with id=0 — this used to leak in as a fake "Librus" / "Temat" message.
+    func testSkipsHeaderRow() {
+        let html = """
+        <table class="decorated stretch"><tbody>
+        <tr>
+          <td><input type="checkbox"></td>
+          <td></td>
+          <td><a href="/wiadomosci/1/5/0/sort_from">Nadawca</a></td>
+          <td><a href="/wiadomosci/1/5/0/sort_subject">Temat</a></td>
+          <td><a href="/wiadomosci/1/5/0/sort_date">Data</a></td>
+        </tr>
+        <tr>
+          <td><input type="checkbox"></td>
+          <td></td>
+          <td><a href="/wiadomosci/1/5/123/f0">Jan Kowalski</a></td>
+          <td><a href="/wiadomosci/1/5/123/f0">Zebranie</a></td>
+          <td>2026-09-20 08:00:00</td>
+        </tr>
+        </tbody></table>
+        """
+        let items = MessagesClient.parseMessageList(html)
+        XCTAssertEqual(items.count, 1)
+        XCTAssertEqual(items.first?.id, 123)
+        XCTAssertEqual(items.first?.correspondent, "Jan Kowalski")
+        XCTAssertEqual(items.first?.subject, "Zebranie")
+    }
+
+    /// Same leak, but the header's sort link happens to carry a non-zero id —
+    /// the subject-is-a-bare-header-word guard catches it instead.
+    func testSkipsHeaderRowWithNonZeroId() {
+        let html = """
+        <table class="decorated stretch"><tbody>
+        <tr>
+          <td><input type="checkbox"></td>
+          <td></td>
+          <td></td>
+          <td><a href="/wiadomosci/1/5/999/f0">Temat</a></td>
+          <td></td>
+        </tr>
+        <tr>
+          <td><input type="checkbox"></td>
+          <td></td>
+          <td><a href="/wiadomosci/1/5/123/f0">Jan Kowalski</a></td>
+          <td><a href="/wiadomosci/1/5/123/f0">Zebranie</a></td>
+          <td>2026-09-20 08:00:00</td>
+        </tr>
+        </tbody></table>
+        """
+        let items = MessagesClient.parseMessageList(html)
+        XCTAssertEqual(items.count, 1)
+        XCTAssertEqual(items.first?.id, 123)
+    }
+
     func testRecoversWhenSenderCellIsAHeaderLabel() {
         // Shifted layout: cell[2] parsed out as the literal column header.
         let html = """
