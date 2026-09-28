@@ -105,6 +105,8 @@ struct LoginView: View {
             Spacer()
         }
         .padding(Theme.Space.xl)
+        .frame(maxWidth: 480) // keeps the form from stretching edge-to-edge on iPad
+        .frame(maxWidth: .infinity)
         .screenBackground()
         .onAppear { focus = .login }
         .animation(Theme.Motion.standard, value: app.loginError)
