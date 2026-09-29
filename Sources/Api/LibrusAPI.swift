@@ -86,10 +86,6 @@ struct LibrusAPI {
         await soft(Librus.Path.classes, as: RawClassesResponse.self)?.studentClass
     }
 
-    func teacherFreeDays() async -> [RawTeacherFreeDay]? {
-        await soft(Librus.Path.teacherFreeDays, as: RawTeacherFreeDaysResponse.self)?.days
-    }
-
     func notes() async -> [RawNote]? {
         await soft(Librus.Path.notes, as: RawNotesResponse.self)?.notes
     }

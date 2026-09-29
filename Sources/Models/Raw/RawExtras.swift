@@ -157,39 +157,6 @@ struct RawEvent: Decodable {
     }
 }
 
-// MARK: - Teacher absences (school-wide, not just this student's own lessons)
-
-struct RawTeacherFreeDaysResponse: Decodable {
-    let days: [RawTeacherFreeDay]
-    enum CodingKeys: String, CodingKey { case days = "TeacherFreeDays" }
-}
-
-struct RawTeacherFreeDay: Decodable {
-    let id: Int
-    let teacher: Ref?
-    let dateFrom: String?
-    let dateTo: String?
-    /// nil on both = absent the whole day; set on both = a partial-day absence.
-    let timeFrom: String?
-    let timeTo: String?
-
-    enum CodingKeys: String, CodingKey {
-        case id = "Id", teacher = "Teacher"
-        case dateFrom = "DateFrom", dateTo = "DateTo"
-        case timeFrom = "TimeFrom", timeTo = "TimeTo"
-    }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        id = c.decodeFlexInt(.id) ?? -1
-        teacher = try? c.decode(Ref.self, forKey: .teacher)
-        dateFrom = try? c.decode(String.self, forKey: .dateFrom)
-        dateTo = try? c.decode(String.self, forKey: .dateTo)
-        timeFrom = try? c.decode(String.self, forKey: .timeFrom)
-        timeTo = try? c.decode(String.self, forKey: .timeTo)
-    }
-}
-
 struct RawEventCategoriesResponse: Decodable {
     let categories: [RawEventCategory]
     enum CodingKeys: String, CodingKey { case categories = "Categories" }

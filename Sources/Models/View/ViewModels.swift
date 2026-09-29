@@ -208,8 +208,9 @@ struct BellPeriod: Identifiable, Codable, Hashable {
     let end: String
 }
 
-/// A teacher's absence, school-wide (`TeacherFreeDays`) — independent of the
-/// student's own timetable, so it also covers teachers who don't teach them.
+/// A teacher's absence, school-wide (scraped off the Terminarz calendar — see
+/// `MessagesClient.teacherAbsences`) — independent of the student's own
+/// timetable, so it also covers teachers who don't teach them.
 struct TeacherAbsence: Identifiable, Codable, Hashable {
     let id: Int
     let teacherName: String

@@ -210,12 +210,13 @@ struct TimetableView: View {
     }
 
     /// `repo.teacherAbsences` is school-wide — every teacher, whether or not
-    /// they teach this student — combining the Terminarz calendar scrape
-    /// (`DataRepository.loadTerminarzAbsences`, the primary and more reliable
-    /// source) with the REST `TeacherFreeDays` endpoint as a baseline. Merged
-    /// here with what the student's own timetable flags per lesson
+    /// they teach this student — scraped off the Terminarz calendar
+    /// (`DataRepository.loadTerminarzAbsences`; the REST `TeacherFreeDays`
+    /// endpoint this app tried first is permission-denied for every
+    /// student/parent account confirmed so far). Merged here with what the
+    /// student's own timetable flags per lesson
     /// (`IsCanceled`/`IsSubstitutionClass`) so nothing only visible in one of
-    /// the sources gets missed.
+    /// the two gets missed.
     private func dayAbsences(_ day: TimetableDay) -> [DayAbsence] {
         var seenTeachers = Set<String>()
         var out: [DayAbsence] = []

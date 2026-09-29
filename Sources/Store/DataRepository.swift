@@ -279,7 +279,6 @@ final class DataRepository {
             async let noteCategoriesT = api.noteCategories()
             async let eventsT = api.events()
             async let eventCategoriesT = api.eventCategories()
-            async let teacherFreeDaysT = api.teacherFreeDays()
             async let schoolT = api.school()
             async let classroomsT = api.classrooms()
 
@@ -391,27 +390,6 @@ final class DataRepository {
                 }.sorted { ($0.date ?? .distantFuture) < ($1.date ?? .distantFuture) }
             }
 
-            if let rawFreeDays = await teacherFreeDaysT {
-                // Upsert by id rather than replacing the array outright — the
-                // Terminarz HTML scrape (loadTerminarzAbsences, triggered per
-                // visible timetable week) is the more reliable source in
-                // practice and writes its own, disjoint (negative) id range
-                // into this same list; a wholesale overwrite here would wipe
-                // that out on the next refresh.
-                var byID = Dictionary(uniqueKeysWithValues: teacherAbsences.map { ($0.id, $0) })
-                for t in rawFreeDays {
-                    guard let teacherId = t.teacher?.id,
-                          let name = userByID[teacherId]?.displayName, !name.isEmpty,
-                          let from = LibrusDate.fromYMD(t.dateFrom) else { continue }
-                    byID[t.id] = TeacherAbsence(
-                        id: t.id, teacherName: name,
-                        dateFrom: from, dateTo: LibrusDate.fromYMD(t.dateTo) ?? from,
-                        timeFrom: t.timeFrom, timeTo: t.timeTo
-                    )
-                }
-                teacherAbsences = byID.values.sorted { $0.dateFrom < $1.dateFrom }
-            }
-
             lastSync = Date()
             saveCache()
 
@@ -475,11 +453,12 @@ final class DataRepository {
         WidgetRefresher.reload()
     }
 
-    /// Best-effort — the Terminarz scrape is a bonus on top of the timetable
-    /// itself (REST `TeacherFreeDays`, fetched in `performCoreFetch`, already
-    /// gives a baseline), so a failure here must never surface as a timetable
-    /// error. Replaces only the specific month(s) the visible week falls in —
-    /// data for months the user hasn't scrolled to stays untouched.
+    /// Best-effort — the REST `TeacherFreeDays` endpoint this app tried first
+    /// is permission-denied for every student/parent account confirmed so far,
+    /// so the Terminarz calendar's own HTML is the only real source; a scrape
+    /// failure here must still never surface as a timetable error. Replaces
+    /// only the specific month(s) the visible week falls in — data for months
+    /// the user hasn't scrolled to stays untouched.
     private func loadTerminarzAbsences(coveringWeekStart weekStart: Date) async {
         let calendar = LibrusDate.calendar
         let months = Set([0, 6].map { calendar.dateComponents([.year, .month], from: LibrusDate.addDays($0, to: weekStart)) })
@@ -500,10 +479,10 @@ final class DataRepository {
             var comps = DateComponents()
             comps.year = year; comps.month = month; comps.day = a.dayOfMonth
             guard let date = calendar.date(from: comps) else { return nil }
-            // Negative, deterministic across runs (unlike String.hashValue) —
-            // stays stable so re-scraping the same month doesn't pile up
-            // duplicate cache entries on every relaunch.
-            let syntheticID = -((year * 10_000 + month * 100 + a.dayOfMonth) * 1_000 + index)
+            // Deterministic across runs (unlike String.hashValue) — stays
+            // stable so re-scraping the same month doesn't pile up duplicate
+            // cache entries on every relaunch.
+            let syntheticID = (year * 10_000 + month * 100 + a.dayOfMonth) * 1_000 + index
             return TeacherAbsence(id: syntheticID, teacherName: a.teacherName,
                                   dateFrom: date, dateTo: date, timeFrom: a.timeFrom, timeTo: a.timeTo)
         }

@@ -31,7 +31,6 @@ struct Diagnostics {
             ("SchoolNotices", Librus.Path.schoolNotices),
             ("HomeWorks (terminarz)", Librus.Path.events),
             ("Notes", Librus.Path.notes),
-            ("TeacherFreeDays", Librus.Path.teacherFreeDays),
         ]
 
         var results: [DiagnosticResult] = [await checkLogin()]
