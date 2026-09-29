@@ -1,6 +1,8 @@
 import Foundation
 
-/// Read + reply access to the Librus message inbox.
+/// Read + reply access to the Librus message inbox, plus anything else this
+/// school's Synergia only serves through the legacy HTML site rather than the
+/// REST API — currently also the Terminarz calendar's teacher-absence list.
 ///
 /// This school's Synergia serves the **legacy** message UI inline at
 /// `synergia.librus.pl/wiadomosci` (HTML 4.01 + jQuery 1.8, `rowCollection.js`) —
@@ -60,6 +62,88 @@ actor MessagesClient {
                 + Self.tableRegion(html))
         }
         return items
+    }
+
+    // MARK: - Terminarz (calendar) — teacher absences
+
+    /// One school-wide teacher absence for a single day of the requested month,
+    /// scraped off the classic `/terminarz` calendar ("Nieobecność" pink boxes).
+    /// Confirmed against a real account 2026-09-29: the REST `TeacherFreeDays`
+    /// endpoint this app also tries can come back empty while this page — what
+    /// the official Librus website itself renders from — has the real data.
+    struct TerminarzAbsence: Sendable {
+        let dayOfMonth: Int
+        let teacherName: String
+        /// Both nil = absent the whole day.
+        let timeFrom: String?
+        let timeTo: String?
+    }
+
+    /// `month` is 1-12. Mirrors the page's own "miesiąc"/"rok" select-and-submit
+    /// form, so any month can be paged to directly without clicking through it.
+    func teacherAbsences(year: Int, month: Int) async throws -> [TerminarzAbsence] {
+        try await ensureSynergiaSession()
+        let requestkey = try await terminarzRequestKey()
+        let (data, resp) = try await post(
+            "https://synergia.librus.pl/terminarz",
+            pairs: [("requestkey", requestkey), ("miesiac", "\(month)"), ("rok", "\(year)")],
+            headers: ["Referer": "https://synergia.librus.pl/terminarz"]
+        )
+        let html = String(data: data, encoding: .utf8) ?? ""
+        let finalURL = resp?.url?.absoluteString ?? ""
+        if finalURL.contains("/loguj") || html.contains(">Brak dostępu<") || html.contains("stop.png") {
+            throw APIError.messageBridgeFailed("Synergia odmówiła dostępu do terminarza · " + lastTrail)
+        }
+        return Self.parseTerminarzAbsences(html)
+    }
+
+    private func terminarzRequestKey() async throws -> String {
+        let (data, _) = try await get("https://synergia.librus.pl/terminarz")
+        let html = String(data: data, encoding: .utf8) ?? ""
+        guard let key = HTTP.firstMatch(#"name=["']requestkey["'][^>]*value=["']([^"']+)["']"#, in: html) else {
+            throw APIError.messageBridgeFailed("brak requestkey w formularzu terminarza")
+        }
+        return key
+    }
+
+    /// Slices the month grid on each day's own `kalendarz-numer-dnia` marker, then
+    /// picks out that day's pink "Nieobecność" rows only — the calendar mixes in
+    /// plenty of other entry types (homework, substitutions, school events) this
+    /// isn't after. (internal for tests)
+    static func parseTerminarzAbsences(_ html: String) -> [TerminarzAbsence] {
+        guard let dayRe = try? NSRegularExpression(pattern: #"<div class="kalendarz-numer-dnia">(\d+)</div>"#),
+              let absenceRe = try? NSRegularExpression(
+                pattern: #"Nieobecność:<br>Nauczyciel: ([^<]+?)(?:<br>Godziny: (\d{2}:\d{2}) do (\d{2}:\d{2})\s*)?</td>"#
+              ) else { return [] }
+
+        let full = html as NSString
+        let markers = dayRe.matches(in: html, range: NSRange(location: 0, length: full.length))
+        guard !markers.isEmpty else { return [] }
+
+        var out: [TerminarzAbsence] = []
+        for (i, marker) in markers.enumerated() {
+            guard let dayRange = Range(marker.range(at: 1), in: html), let day = Int(html[dayRange]) else { continue }
+            let start = marker.range.location + marker.range.length
+            let end = i + 1 < markers.count ? markers[i + 1].range.location : full.length
+            guard end > start else { continue }
+            let chunk = full.substring(with: NSRange(location: start, length: end - start))
+            let chunkNS = chunk as NSString
+
+            for m in absenceRe.matches(in: chunk, range: NSRange(location: 0, length: chunkNS.length)) {
+                guard let nameRange = Range(m.range(at: 1), in: chunk) else { continue }
+                let name = chunk[nameRange].trimmingCharacters(in: .whitespaces)
+                guard !name.isEmpty else { continue }
+                var timeFrom: String?, timeTo: String?
+                if m.range(at: 2).location != NSNotFound, let r = Range(m.range(at: 2), in: chunk) {
+                    timeFrom = String(chunk[r])
+                }
+                if m.range(at: 3).location != NSNotFound, let r = Range(m.range(at: 3), in: chunk) {
+                    timeTo = String(chunk[r])
+                }
+                out.append(TerminarzAbsence(dayOfMonth: day, teacherName: name, timeFrom: timeFrom, timeTo: timeTo))
+            }
+        }
+        return out
     }
 
     struct MessageContent: Sendable {

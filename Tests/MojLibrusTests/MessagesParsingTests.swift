@@ -94,6 +94,39 @@ final class MessagesParsingTests: XCTestCase {
         XCTAssertEqual(items.first?.id, 123)
     }
 
+    /// Real markup shape captured from the Terminarz calendar 2026-09-29 —
+    /// each day is a `kalendarz-numer-dnia` marker followed by a nested table of
+    /// colour-coded rows; only the pink "Nieobecność" ones are teacher absences.
+    func testParsesTerminarzAbsences() {
+        let html = """
+        <td class="center"><div class="kalendarz-dzien"><div class="kalendarz-numer-dnia">11</div><table><tbody>\
+        <tr><td class="no-border-left no-border-right" style="background-color: rgb(255, 120, 120); color: rgb(49, 51, 50);" onclick="location.href='/terminarz/szczegoly_wolne/3704850'">Nieobecność:<br>Nauczyciel: Pytel Renata<br>Godziny: 11:30 do 12:15 </td></tr>\
+        <tr><td class="no-border-left no-border-right" style="background-color: rgb(255, 120, 120); color: rgb(49, 51, 50);" onclick="location.href='/terminarz/szczegoly_wolne/3695339'">Nieobecność:<br>Nauczyciel: Warchał Wojciech</td></tr>\
+        <tr><td class="no-border-right no-border-left" style="background-color: rgb(106, 150, 4); color: rgb(255, 255, 255);">Zastępstwo z Katarzyna Chmiel na lekcji nr: 5 (Wychowanie fizyczne)</td></tr>\
+        </tbody></table></div></td>
+        <td class="center weekend"><div class="kalendarz-dzien"><div class="kalendarz-numer-dnia">12</div></div></td>
+        <td class="center"><div class="kalendarz-dzien"><div class="kalendarz-numer-dnia">13</div><table><tbody>\
+        <tr><td class="no-border-left no-border-right" style="background-color: rgb(255, 120, 120); color: rgb(49, 51, 50);" onclick="location.href='/terminarz/szczegoly_wolne/3695336'">Nieobecność:<br>Nauczyciel: Galant Krystyna</td></tr>\
+        </tbody></table></div></td>
+        """
+        let items = MessagesClient.parseTerminarzAbsences(html)
+        XCTAssertEqual(items.count, 3)
+
+        let day11 = items.filter { $0.dayOfMonth == 11 }
+        XCTAssertEqual(day11.count, 2)
+        XCTAssertEqual(day11.first?.teacherName, "Pytel Renata")
+        XCTAssertEqual(day11.first?.timeFrom, "11:30")
+        XCTAssertEqual(day11.first?.timeTo, "12:15")
+        XCTAssertEqual(day11.last?.teacherName, "Warchał Wojciech")
+        XCTAssertNil(day11.last?.timeFrom)
+
+        XCTAssertTrue(items.contains { $0.dayOfMonth == 12 } == false)
+
+        let day13 = items.filter { $0.dayOfMonth == 13 }
+        XCTAssertEqual(day13.count, 1)
+        XCTAssertEqual(day13.first?.teacherName, "Galant Krystyna")
+    }
+
     func testRecoversWhenSenderCellIsAHeaderLabel() {
         // Shifted layout: cell[2] parsed out as the literal column header.
         let html = """

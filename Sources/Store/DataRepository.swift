@@ -392,16 +392,24 @@ final class DataRepository {
             }
 
             if let rawFreeDays = await teacherFreeDaysT {
-                teacherAbsences = rawFreeDays.compactMap { t in
+                // Upsert by id rather than replacing the array outright — the
+                // Terminarz HTML scrape (loadTerminarzAbsences, triggered per
+                // visible timetable week) is the more reliable source in
+                // practice and writes its own, disjoint (negative) id range
+                // into this same list; a wholesale overwrite here would wipe
+                // that out on the next refresh.
+                var byID = Dictionary(uniqueKeysWithValues: teacherAbsences.map { ($0.id, $0) })
+                for t in rawFreeDays {
                     guard let teacherId = t.teacher?.id,
                           let name = userByID[teacherId]?.displayName, !name.isEmpty,
-                          let from = LibrusDate.fromYMD(t.dateFrom) else { return nil }
-                    return TeacherAbsence(
+                          let from = LibrusDate.fromYMD(t.dateFrom) else { continue }
+                    byID[t.id] = TeacherAbsence(
                         id: t.id, teacherName: name,
                         dateFrom: from, dateTo: LibrusDate.fromYMD(t.dateTo) ?? from,
                         timeFrom: t.timeFrom, timeTo: t.timeTo
                     )
-                }.sorted { $0.dateFrom < $1.dateFrom }
+                }
+                teacherAbsences = byID.values.sorted { $0.dateFrom < $1.dateFrom }
             }
 
             lastSync = Date()
@@ -461,9 +469,46 @@ final class DataRepository {
         if !Seen.timetableChanges.hasBaseline {
             Seen.timetableChanges.establishBaseline(upcomingChangeSignatures())
         }
+        await loadTerminarzAbsences(coveringWeekStart: weekStart)
         saveCache()
         SharedStore.publishTimetable(upcomingDays())
         WidgetRefresher.reload()
+    }
+
+    /// Best-effort — the Terminarz scrape is a bonus on top of the timetable
+    /// itself (REST `TeacherFreeDays`, fetched in `performCoreFetch`, already
+    /// gives a baseline), so a failure here must never surface as a timetable
+    /// error. Replaces only the specific month(s) the visible week falls in —
+    /// data for months the user hasn't scrolled to stays untouched.
+    private func loadTerminarzAbsences(coveringWeekStart weekStart: Date) async {
+        let calendar = LibrusDate.calendar
+        let months = Set([0, 6].map { calendar.dateComponents([.year, .month], from: LibrusDate.addDays($0, to: weekStart)) })
+        for comps in months {
+            guard let year = comps.year, let month = comps.month,
+                  let scraped = try? await messages.teacherAbsences(year: year, month: month) else { continue }
+            mergeTerminarzAbsences(scraped, year: year, month: month)
+        }
+    }
+
+    private func mergeTerminarzAbsences(_ scraped: [MessagesClient.TerminarzAbsence], year: Int, month: Int) {
+        let calendar = LibrusDate.calendar
+        teacherAbsences.removeAll {
+            let c = calendar.dateComponents([.year, .month], from: $0.dateFrom)
+            return c.year == year && c.month == month
+        }
+        let fresh: [TeacherAbsence] = scraped.enumerated().compactMap { index, a in
+            var comps = DateComponents()
+            comps.year = year; comps.month = month; comps.day = a.dayOfMonth
+            guard let date = calendar.date(from: comps) else { return nil }
+            // Negative, deterministic across runs (unlike String.hashValue) —
+            // stays stable so re-scraping the same month doesn't pile up
+            // duplicate cache entries on every relaunch.
+            let syntheticID = -((year * 10_000 + month * 100 + a.dayOfMonth) * 1_000 + index)
+            return TeacherAbsence(id: syntheticID, teacherName: a.teacherName,
+                                  dateFrom: date, dateTo: date, timeFrom: a.timeFrom, timeTo: a.timeTo)
+        }
+        teacherAbsences.append(contentsOf: fresh)
+        teacherAbsences.sort { $0.dateFrom < $1.dateFrom }
     }
 
     // MARK: - Messages

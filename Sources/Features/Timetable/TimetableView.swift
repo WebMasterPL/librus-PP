@@ -196,9 +196,9 @@ struct TimetableView: View {
     // MARK: - Teacher absences
 
     /// One line in the day's absence summary — either a school-wide entry from
-    /// `TeacherFreeDays` (may or may not be one of this student's own teachers)
-    /// or, as a fallback, something the student's own timetable flags that the
-    /// school-wide list didn't cover (the two can lag behind each other).
+    /// `repo.teacherAbsences` (may or may not be one of this student's own
+    /// teachers) or, as a fallback, something the student's own timetable flags
+    /// that the school-wide list didn't cover (the two can lag behind each other).
     private struct DayAbsence: Identifiable {
         let id: String
         let teacherName: String
@@ -209,11 +209,13 @@ struct TimetableView: View {
         let timeRange: String?
     }
 
-    /// Librus exposes teacher absences two ways for a student account: the
-    /// school-wide `TeacherFreeDays` list (every teacher, whether or not they
-    /// teach this student) and, per lesson, `IsCanceled`/`IsSubstitutionClass`
-    /// on the student's own timetable. Merge both so nothing only visible in
-    /// one of the two sources gets missed.
+    /// `repo.teacherAbsences` is school-wide — every teacher, whether or not
+    /// they teach this student — combining the Terminarz calendar scrape
+    /// (`DataRepository.loadTerminarzAbsences`, the primary and more reliable
+    /// source) with the REST `TeacherFreeDays` endpoint as a baseline. Merged
+    /// here with what the student's own timetable flags per lesson
+    /// (`IsCanceled`/`IsSubstitutionClass`) so nothing only visible in one of
+    /// the sources gets missed.
     private func dayAbsences(_ day: TimetableDay) -> [DayAbsence] {
         var seenTeachers = Set<String>()
         var out: [DayAbsence] = []
