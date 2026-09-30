@@ -35,8 +35,12 @@ struct DiagnosticsView: View {
                     title: "Kopiuj surowy JSON ocen",
                     fetch: { await Diagnostics(session: app.session).rawGradesJSON() }
                 )
+                RawDumpButton(
+                    title: "Kopiuj surowy HTML terminarza",
+                    fetch: { await Diagnostics(session: app.session).rawTerminarzHTML() }
+                )
             } footer: {
-                Text("Pełna, niesformatowana odpowiedź Librusa dla wybranego modułu — przydatne przy zgłaszaniu błędów (plan lekcji: ubiegły/bieżący/przyszły tydzień; oceny: Grades + PointGrades + ich kategorie i komentarze). Zawiera imiona i nazwiska nauczycieli.")
+                Text("Pełna, niesformatowana odpowiedź Librusa dla wybranego modułu — przydatne przy zgłaszaniu błędów (plan lekcji: ubiegły/bieżący/przyszły tydzień; oceny: Grades + PointGrades + ich kategorie i komentarze; terminarz: bieżący miesiąc, źródło „Nieobecności nauczycieli”). Zawiera imiona i nazwiska nauczycieli.")
             }
 
             if !results.isEmpty {

@@ -82,6 +82,13 @@ actor MessagesClient {
     /// `month` is 1-12. Mirrors the page's own "miesiąc"/"rok" select-and-submit
     /// form, so any month can be paged to directly without clicking through it.
     func teacherAbsences(year: Int, month: Int) async throws -> [TerminarzAbsence] {
+        Self.parseTerminarzAbsences(try await terminarzHTML(year: year, month: month))
+    }
+
+    /// Undecoded page HTML for the requested month — used by Diagnostics so a
+    /// parsing gap can be seen and fixed against what Librus actually sent,
+    /// instead of guessed at again.
+    func terminarzHTML(year: Int, month: Int) async throws -> String {
         try await ensureSynergiaSession()
         let requestkey = try await terminarzRequestKey()
         let (data, resp) = try await post(
@@ -94,7 +101,7 @@ actor MessagesClient {
         if finalURL.contains("/loguj") || html.contains(">Brak dostępu<") || html.contains("stop.png") {
             throw APIError.messageBridgeFailed("Synergia odmówiła dostępu do terminarza · " + lastTrail)
         }
-        return Self.parseTerminarzAbsences(html)
+        return html
     }
 
     private func terminarzRequestKey() async throws -> String {

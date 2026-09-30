@@ -131,6 +131,23 @@ struct Diagnostics {
         return parts.joined(separator: "\n\n")
     }
 
+    /// Undecoded HTML of the current month's Terminarz calendar — lets us see
+    /// exactly what Librus sent (or whether the request itself is failing) when
+    /// the "Nieobecności nauczycieli" summary doesn't show what it should.
+    func rawTerminarzHTML() async -> String {
+        let client = MessagesClient(session: session)
+        let today = LibrusDate.today
+        let comps = LibrusDate.calendar.dateComponents([.year, .month], from: today)
+        guard let year = comps.year, let month = comps.month else { return "BŁĄD: brak roku/miesiąca" }
+        do {
+            let html = try await client.terminarzHTML(year: year, month: month)
+            return "=== terminarz \(year)-\(month) (\(html.count) znaków) ===\n\(html)"
+        } catch {
+            let msg = (error as? LocalizedError)?.errorDescription ?? "\(error)"
+            return "=== terminarz \(year)-\(month) === BŁĄD: \(msg)"
+        }
+    }
+
     static func report(_ results: [DiagnosticResult]) -> String {
         var lines = ["Librus Plus — diagnostyka \(Date().formattedPL("yyyy-MM-dd HH:mm"))"]
         for r in results {
