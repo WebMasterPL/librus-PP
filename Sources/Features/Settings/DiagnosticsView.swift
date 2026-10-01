@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 
 struct DiagnosticsView: View {
     @Environment(AppState.self) private var app
+    @Environment(DataRepository.self) private var repo
 
     @State private var results: [DiagnosticResult] = []
     @State private var running = false
@@ -41,6 +42,24 @@ struct DiagnosticsView: View {
                 )
             } footer: {
                 Text("Pełna, niesformatowana odpowiedź Librusa dla wybranego modułu — przydatne przy zgłaszaniu błędów (plan lekcji: ubiegły/bieżący/przyszły tydzień; oceny: Grades + PointGrades + ich kategorie i komentarze; terminarz: bieżący miesiąc, źródło „Nieobecności nauczycieli”). Zawiera imiona i nazwiska nauczycieli.")
+            }
+
+            Section {
+                RawDumpButton(
+                    title: "Pobierz nieobecności nauczycieli",
+                    fetch: {
+                        await repo.reloadTeacherAbsences()
+                        return teacherAbsencesReport()
+                    }
+                )
+                if let status = repo.teacherAbsencesStatus {
+                    Text(status)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
+            } footer: {
+                Text("Ta sama ścieżka co w Planie lekcji (bieżący tydzień). Wynik trafia też do schowka.")
             }
 
             if !results.isEmpty {
@@ -90,6 +109,15 @@ struct DiagnosticsView: View {
         .navigationTitle("Diagnostyka")
         .navigationBarTitleDisplayMode(.inline)
         .animation(Theme.Motion.standard, value: results.count)
+    }
+
+    private func teacherAbsencesReport() -> String {
+        var lines = [repo.teacherAbsencesStatus ?? "brak statusu"]
+        for a in repo.teacherAbsences {
+            let time = a.isFullDay ? "cały dzień" : "\(a.timeFrom ?? "?")–\(a.timeTo ?? "?")"
+            lines.append("\(LibrusDate.ymdString(a.dateFrom)) \(a.teacherName) — \(time)")
+        }
+        return lines.joined(separator: "\n")
     }
 
     private func runChecks() async {

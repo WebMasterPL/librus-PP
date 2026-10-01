@@ -15,6 +15,13 @@ actor MessagesClient {
     private let session: LibrusSession
     private let http: URLSession
     private var sessionEstablishedAt: Date?
+    /// Actor methods re-enter at every `await`, so without this two callers
+    /// (inbox + timetable load at launch) each run their own AutoLoginToken
+    /// login and the second one's cookie replaces the first mid-request.
+    private var sessionTask: Task<Void, Error>?
+    /// Same reason: a Terminarz GET (requestkey) and its POST must not have a
+    /// different session's request interleaved between them.
+    private var terminarzTask: Task<String, Error>?
 
     /// Human-readable trace of the last session attempt — surfaced in errors so a
     /// remote Diagnostics report shows where it broke.
@@ -89,6 +96,24 @@ actor MessagesClient {
     /// parsing gap can be seen and fixed against what Librus actually sent,
     /// instead of guessed at again.
     func terminarzHTML(year: Int, month: Int) async throws -> String {
+        while let running = terminarzTask { _ = try? await running.value }
+        let task = Task { try await self.terminarzHTMLRetrying(year: year, month: month) }
+        terminarzTask = task
+        defer { if terminarzTask == task { terminarzTask = nil } }
+        return try await task.value
+    }
+
+    /// A long-lived client's Synergia session can die server-side before our
+    /// 20-minute local window is up — one retry on a freshly logged-in session.
+    private func terminarzHTMLRetrying(year: Int, month: Int) async throws -> String {
+        do { return try await terminarzHTMLOnce(year: year, month: month) }
+        catch {
+            invalidateSession()
+            return try await terminarzHTMLOnce(year: year, month: month)
+        }
+    }
+
+    private func terminarzHTMLOnce(year: Int, month: Int) async throws -> String {
         try await ensureSynergiaSession()
         let requestkey = try await terminarzRequestKey()
         let (data, resp) = try await post(
@@ -101,7 +126,23 @@ actor MessagesClient {
         if finalURL.contains("/loguj") || html.contains(">Brak dostępu<") || html.contains("stop.png") {
             throw APIError.messageBridgeFailed("Synergia odmówiła dostępu do terminarza · " + lastTrail)
         }
+        guard html.contains("kalendarz-numer-dnia") else {
+            throw APIError.messageBridgeFailed("brak kalendarza w odpowiedzi terminarza · " + snippet(html))
+        }
+        // An ignored POST falls back to the current month — merging that under
+        // the requested month would put absences on the wrong days.
+        guard Self.terminarzShownMonth(html) == month else {
+            throw APIError.messageBridgeFailed("terminarz zwrócił inny miesiąc niż \(month)")
+        }
         return html
+    }
+
+    /// The month the calendar grid actually shows — its `miesiac` select's
+    /// selected option. (internal for tests)
+    static func terminarzShownMonth(_ html: String) -> Int? {
+        guard let select = HTTP.firstMatch(#"(?s)<select name="miesiac"(.*?)</select>"#, in: html),
+              let value = HTTP.firstMatch(#"value="(\d+)"\s+selected"#, in: select) else { return nil }
+        return Int(value)
     }
 
     private func terminarzRequestKey() async throws -> String {
@@ -497,6 +538,14 @@ actor MessagesClient {
     private func ensureSynergiaSession() async throws {
         if let at = sessionEstablishedAt, Date().timeIntervalSince(at) < 20 * 60,
            cookie("DZIENNIKSID", domainContains: "synergia") != nil { return }
+        if let running = sessionTask { return try await running.value }
+        let task = Task { try await self.establishSynergiaSession() }
+        sessionTask = task
+        defer { if sessionTask == task { sessionTask = nil } }
+        try await task.value
+    }
+
+    private func establishSynergiaSession() async throws {
 
         var steps: [String] = []
         func note(_ s: String) { steps.append(s); lastTrail = steps.joined(separator: " | ") }

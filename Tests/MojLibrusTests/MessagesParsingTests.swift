@@ -153,6 +153,14 @@ final class MessagesParsingTests: XCTestCase {
         XCTAssertEqual(items[1].timeTo, "12:15")
     }
 
+    func testTerminarzShownMonth() {
+        let html = """
+        <select name="miesiac"  class="ListaWyboru" onChange="this.form.submit();"><option value="1">Styczeń</option><option value="9">Wrzesień</option><option value="10" selected="selected" >Październik</option><option value="11">Listopad</option></select>&nbsp;<select name="rok" class="ListaWyboru"><option value="2026" selected="selected" > 2026</option></select>
+        """
+        XCTAssertEqual(MessagesClient.terminarzShownMonth(html), 10)
+        XCTAssertNil(MessagesClient.terminarzShownMonth("<html>login</html>"))
+    }
+
     func testRecoversWhenSenderCellIsAHeaderLabel() {
         // Shifted layout: cell[2] parsed out as the literal column header.
         let html = """

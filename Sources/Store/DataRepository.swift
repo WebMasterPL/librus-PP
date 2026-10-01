@@ -23,6 +23,9 @@ final class DataRepository {
     /// School-wide, not filtered to this student's own timetable — some schools
     /// don't expose this at all, in which case it just stays empty.
     var teacherAbsences: [TeacherAbsence] = []
+    /// Outcome of the last Terminarz scrape — shown in Diagnostics, since a
+    /// failure here is deliberately kept out of the timetable's own error UI.
+    var teacherAbsencesStatus: String?
     var messagesInbox: [MessageItem] = []
     var messagesSent: [MessageItem] = []
     var bellSchedule: [BellPeriod] = []
@@ -462,11 +465,25 @@ final class DataRepository {
     private func loadTerminarzAbsences(coveringWeekStart weekStart: Date) async {
         let calendar = LibrusDate.calendar
         let months = Set([0, 6].map { calendar.dateComponents([.year, .month], from: LibrusDate.addDays($0, to: weekStart)) })
-        for comps in months {
-            guard let year = comps.year, let month = comps.month,
-                  let scraped = try? await messages.teacherAbsences(year: year, month: month) else { continue }
-            mergeTerminarzAbsences(scraped, year: year, month: month)
+        var report: [String] = []
+        for comps in months.sorted(by: { ($0.year ?? 0, $0.month ?? 0) < ($1.year ?? 0, $1.month ?? 0) }) {
+            guard let year = comps.year, let month = comps.month else { continue }
+            do {
+                let scraped = try await messages.teacherAbsences(year: year, month: month)
+                mergeTerminarzAbsences(scraped, year: year, month: month)
+                report.append("\(year)-\(month): \(scraped.count) wpisów")
+            } catch {
+                report.append("\(year)-\(month): BŁĄD \((error as? LocalizedError)?.errorDescription ?? "\(error)")")
+            }
         }
+        teacherAbsencesStatus = "\(Date().formattedPL("HH:mm:ss")) · " + report.joined(separator: " · ")
+            + " · w pamięci: \(teacherAbsences.count)"
+    }
+
+    /// Same path the timetable takes, run on demand from Diagnostics.
+    func reloadTeacherAbsences() async {
+        await loadTerminarzAbsences(coveringWeekStart: LibrusDate.weekStart())
+        saveCache()
     }
 
     private func mergeTerminarzAbsences(_ scraped: [MessagesClient.TerminarzAbsence], year: Int, month: Int) {
