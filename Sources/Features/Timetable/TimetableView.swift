@@ -214,9 +214,8 @@ struct TimetableView: View {
     /// (`DataRepository.loadTerminarzAbsences`; the REST `TeacherFreeDays`
     /// endpoint this app tried first is permission-denied for every
     /// student/parent account confirmed so far). Merged here with what the
-    /// student's own timetable flags per lesson
-    /// (`IsCanceled`/`IsSubstitutionClass`) so nothing only visible in one of
-    /// the two gets missed.
+    /// student's own cancelled lessons (`IsCanceled`) so nothing only visible
+    /// in one of the two gets missed.
     private func dayAbsences(_ day: TimetableDay) -> [DayAbsence] {
         var seenTeachers = Set<String>()
         var out: [DayAbsence] = []
@@ -235,9 +234,10 @@ struct TimetableView: View {
             ))
         }
 
-        for entry in day.entries where entry.isCancelled || entry.isSubstitution {
-            let name = entry.isCancelled ? entry.teacher : (entry.originalTeacher ?? entry.teacher)
-            guard let name, seenTeachers.insert(name).inserted else { continue }
+        // Substitutions stay out: a swapped teacher or a moved lesson isn't
+        // proof anyone is absent — only the Terminarz list says that.
+        for entry in day.entries where entry.isCancelled {
+            guard let name = entry.teacher, seenTeachers.insert(name).inserted else { continue }
             out.append(DayAbsence(id: "lesson-\(entry.id)", teacherName: name,
                                   lessonNo: entry.lessonNo, subject: entry.subject, timeRange: nil))
         }
