@@ -220,15 +220,16 @@ struct TimetableView: View {
         var seenTeachers = Set<String>()
         var out: [DayAbsence] = []
 
-        for absence in repo.teacherAbsences where absence.includes(day.date) {
-            guard seenTeachers.insert(absence.teacherName).inserted else { continue }
-            let lesson = day.entries.first {
-                ($0.isCancelled && $0.teacher == absence.teacherName)
-                    || ($0.isSubstitution && ($0.originalTeacher ?? $0.teacher) == absence.teacherName)
-            }
+        // Full-day first, so a teacher listed both ways shows once, as the
+        // whole day. No lesson is attached: absent then is absent from it too.
+        let terminarz = repo.teacherAbsences
+            .filter { $0.includes(day.date) }
+            .sorted { $0.isFullDay && !$1.isFullDay }
+        for absence in terminarz {
+            guard seenTeachers.insert(Self.nameKey(absence.teacherName)).inserted else { continue }
             out.append(DayAbsence(
                 id: "free-\(absence.id)", teacherName: absence.teacherName,
-                lessonNo: lesson?.lessonNo, subject: lesson?.subject,
+                lessonNo: nil, subject: nil,
                 timeRange: absence.isFullDay ? nil
                     : [absence.timeFrom, absence.timeTo].compactMap { $0 }.joined(separator: "–")
             ))
@@ -237,11 +238,17 @@ struct TimetableView: View {
         // Substitutions stay out: a swapped teacher or a moved lesson isn't
         // proof anyone is absent — only the Terminarz list says that.
         for entry in day.entries where entry.isCancelled {
-            guard let name = entry.teacher, seenTeachers.insert(name).inserted else { continue }
+            guard let name = entry.teacher, seenTeachers.insert(Self.nameKey(name)).inserted else { continue }
             out.append(DayAbsence(id: "lesson-\(entry.id)", teacherName: name,
                                   lessonNo: entry.lessonNo, subject: entry.subject, timeRange: nil))
         }
         return out
+    }
+
+    /// Terminarz writes "Nazwisko Imię", the timetable "Imię Nazwisko" — compare
+    /// as an order-independent set of words.
+    static func nameKey(_ name: String) -> String {
+        name.lowercased().split(whereSeparator: \.isWhitespace).sorted().joined(separator: " ")
     }
 
     /// Collapsed by default — a day with several absences shouldn't push the

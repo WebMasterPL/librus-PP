@@ -161,6 +161,13 @@ final class MessagesParsingTests: XCTestCase {
         XCTAssertNil(MessagesClient.terminarzShownMonth("<html>login</html>"))
     }
 
+    func testTeacherNameKeyIgnoresWordOrder() {
+        XCTAssertEqual(TimetableView.nameKey("Lasak Marcin"), TimetableView.nameKey("Marcin Lasak"))
+        XCTAssertEqual(TimetableView.nameKey("Stelmaszczyk-Stawowy Honorata"),
+                       TimetableView.nameKey("Honorata  Stelmaszczyk-Stawowy"))
+        XCTAssertNotEqual(TimetableView.nameKey("Lasak Marcin"), TimetableView.nameKey("Mazur Marcin"))
+    }
+
     func testRecoversWhenSenderCellIsAHeaderLabel() {
         // Shifted layout: cell[2] parsed out as the literal column header.
         let html = """
