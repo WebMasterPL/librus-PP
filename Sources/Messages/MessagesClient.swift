@@ -117,10 +117,14 @@ actor MessagesClient {
     /// picks out that day's pink "Nieobecność" rows only — the calendar mixes in
     /// plenty of other entry types (homework, substitutions, school events) this
     /// isn't after. (internal for tests)
+    ///
+    /// `<br\s*/?>` rather than a literal `<br>`: a real POST response (confirmed
+    /// live 2026-09-30) renders XHTML-style self-closing `<br />` here, which a
+    /// bare `<br>` pattern never matches — silently zero results, no error.
     static func parseTerminarzAbsences(_ html: String) -> [TerminarzAbsence] {
         guard let dayRe = try? NSRegularExpression(pattern: #"<div class="kalendarz-numer-dnia">(\d+)</div>"#),
               let absenceRe = try? NSRegularExpression(
-                pattern: #"Nieobecność:<br>Nauczyciel: ([^<]+?)(?:<br>Godziny: (\d{2}:\d{2}) do (\d{2}:\d{2})\s*)?</td>"#
+                pattern: #"Nieobecność:<br\s*/?>Nauczyciel: ([^<]+?)(?:<br\s*/?>Godziny: (\d{2}:\d{2}) do (\d{2}:\d{2})\s*)?</td>"#
               ) else { return [] }
 
         let full = html as NSString

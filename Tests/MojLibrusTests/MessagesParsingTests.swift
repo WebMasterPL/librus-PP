@@ -127,6 +127,32 @@ final class MessagesParsingTests: XCTestCase {
         XCTAssertEqual(day13.first?.teacherName, "Galant Krystyna")
     }
 
+    /// Regression: a real `POST /terminarz` response (confirmed live
+    /// 2026-09-30) renders self-closing `<br />`, not the bare `<br>` the first
+    /// capture above used — the old pattern matched zero rows against this,
+    /// silently (no error), which is why the summary stayed empty. Verbatim
+    /// excerpt (day 1) also carries "Odwołane zajęcia" and a homework entry in
+    /// the same cell, to confirm those still get skipped.
+    func testParsesTerminarzAbsencesWithSelfClosingBr() {
+        let html = """
+        <td class="center today " ><div class="kalendarz-dzien"><div class="kalendarz-numer-dnia">1</div><table><tbody>\
+        <tr><td class="no-border-left no-border-right" style="background-color: #FF7878; " onclick="location.href='/terminarz/szczegoly_wolne/3706745'" >Nieobecność:<br />Nauczyciel: Galant Krystyna</td></tr>\
+        <tr><td class="no-border-left no-border-right" style="background-color: #FF7878; " onclick="location.href='/terminarz/szczegoly_wolne/3738786'" >Nieobecność:<br />Nauczyciel: Mazur Marcin<br />Godziny: 11:30 do 12:15 </td></tr>\
+        <tr><td style="background-color: #6A9604; " >
+                            Odwołane zajęcia <br>Marcin Lasak na lekcji nr: 0 (Specjalizacja)
+                            </td></tr>\
+        <tr><td class="no-border-left no-border-right" style="background-color: #32CD32; cursor: pointer;" title="Nauczyciel: Janecki Marian" onclick="location.href='/terminarz/szczegoly/13939037'">Nr lekcji: 5<br /><span class="przedmiot">Historia</span>, sprawdzian<br />5in T4<br/>Sala:&nbsp;305</td></tr>\
+        </tbody></table></div></td>
+        """
+        let items = MessagesClient.parseTerminarzAbsences(html)
+        XCTAssertEqual(items.count, 2)
+        XCTAssertEqual(items[0].teacherName, "Galant Krystyna")
+        XCTAssertNil(items[0].timeFrom)
+        XCTAssertEqual(items[1].teacherName, "Mazur Marcin")
+        XCTAssertEqual(items[1].timeFrom, "11:30")
+        XCTAssertEqual(items[1].timeTo, "12:15")
+    }
+
     func testRecoversWhenSenderCellIsAHeaderLabel() {
         // Shifted layout: cell[2] parsed out as the literal column header.
         let html = """
