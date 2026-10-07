@@ -36,6 +36,12 @@ struct GradesView: View {
         return a.isEmpty ? nil : a.reduce(0, +) / Double(a.count)
     }
 
+    /// Pooled over every visible subject's point grades, not an average of
+    /// per-subject percentages — a 100-point test outweighs a 5-point quiz.
+    private var overallPointPercent: Double? {
+        GradeMath.pointPercent(visibleSubjects.flatMap { $0.filtered(filter, current: current) })
+    }
+
     var body: some View {
         List {
             if let error = repo.lastError {
@@ -58,6 +64,19 @@ struct GradesView: View {
                             .font(.title3.weight(.bold))
                             .fontDesign(.rounded)
                             .foregroundStyle(gradeColor(for: avg))
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+
+                if let pct = overallPointPercent {
+                    HStack {
+                        Text("Średnia punktowa")
+                            .font(.subheadline)
+                        Spacer()
+                        Text(GradeMath.formatPercent(pct))
+                            .font(.title3.weight(.bold))
+                            .fontDesign(.rounded)
+                            .foregroundStyle(gradeColor(for: percentColorValue(pct)))
                     }
                     .accessibilityElement(children: .combine)
                 }
@@ -100,6 +119,11 @@ struct GradesView: View {
                             Text(GradeMath.format(avg))
                                 .fontDesign(.rounded)
                                 .foregroundStyle(gradeColor(for: avg))
+                        }
+                        if let pct = subject.pointPercent(filter, current: current) {
+                            Text(GradeMath.formatPercent(pct))
+                                .fontDesign(.rounded)
+                                .foregroundStyle(gradeColor(for: percentColorValue(pct)))
                         }
                         Button {
                             Haptics.tap()
@@ -209,6 +233,9 @@ struct GradeDetailView: View {
                         ? "\(GradeMath.formatPoint(value)) / \(GradeMath.formatPoint(grade.pointMax))"
                         : GradeMath.format(value))
                 }
+                if let value = grade.value, let max = grade.pointMax, max > 0 {
+                    KeyValueRow(key: "Procent", value: GradeMath.formatPercent(value / max * 100))
+                }
                 if grade.weight > 0 { KeyValueRow(key: "Waga", value: GradeMath.format(grade.weight)) }
                 KeyValueRow(key: "Liczona do średniej", value: grade.countsToAverage ? "Tak" : "Nie")
                 KeyValueRow(key: "Rodzaj", value: GradeRow.label(for: grade.kind))
@@ -230,4 +257,9 @@ struct GradeDetailView: View {
         .navigationTitle("Szczegóły oceny")
         .navigationBarTitleDisplayMode(.inline)
     }
+}
+
+/// A 0-100 percentage on the 1-6 scale `gradeColor` expects.
+func percentColorValue(_ percent: Double) -> Double {
+    1 + percent / 100 * 5
 }

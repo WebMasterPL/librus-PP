@@ -17,6 +17,8 @@ struct MessageComposeView: View {
     @State private var sending = false
     @State private var errorText: String?
     @State private var confirm = false
+    @State private var history: [MessageHistory.Entry] = []
+    @State private var filling = false
 
     private var selectedNames: String {
         selectedPeople.map(\.name).joined(separator: ", ")
@@ -28,9 +30,48 @@ struct MessageComposeView: View {
             && !sending
     }
 
+    /// Offered only while the form is still blank — once anything is typed or
+    /// picked, a tap would overwrite the user's own input.
+    private var showSuggestions: Bool {
+        selectedPeople.isEmpty && subject.isEmpty && text.isEmpty
+            && (!history.isEmpty || !serverSuggestions.isEmpty)
+    }
+
+    /// "Wysłane" from Librus that aren't already in the local history.
+    private var serverSuggestions: [MessageItem] {
+        let known = Set(history.map(\.subject))
+        return Array(repo.messagesSent.filter { !known.contains($0.subject) }
+            .prefix(max(0, 5 - history.count)))
+    }
+
     var body: some View {
         NavigationStack {
             Form {
+                if showSuggestions {
+                    Section {
+                        ForEach(history.prefix(5)) { entry in
+                            suggestionRow(to: entry.recipients.map(\.name).joined(separator: ", "),
+                                          subject: entry.subject, snippet: entry.body) {
+                                Haptics.tap()
+                                selectedPeople = entry.recipients
+                                category = entry.category
+                                subject = entry.subject
+                                text = entry.body
+                            }
+                        }
+                        ForEach(serverSuggestions) { item in
+                            suggestionRow(to: item.correspondent, subject: item.subject, snippet: nil) {
+                                Haptics.tap()
+                                Task { await fill(from: item) }
+                            }
+                        }
+                    } header: {
+                        Text("Ostatnio wysłane")
+                    } footer: {
+                        Text("Dotknij, aby wypełnić odbiorcę, temat i treść.")
+                    }
+                }
+
                 Section("Do") {
                     if loading {
                         HStack(spacing: Theme.Space.sm) {
@@ -89,6 +130,11 @@ struct MessageComposeView: View {
                 }
             }
             .overlay {
+                if filling {
+                    ProgressView("Wczytywanie…")
+                        .padding()
+                        .glassPanel()
+                }
                 if sending {
                     ProgressView("Wysyłanie…")
                         .padding()
@@ -101,8 +147,59 @@ struct MessageComposeView: View {
             } message: {
                 Text("Do: \(selectedNames)\nTemat: \(subject.isEmpty ? "(bez tematu)" : subject)")
             }
-            .task { await loadCategories() }
+            .task {
+                history = MessageHistory.load()
+                await loadCategories()
+            }
         }
+    }
+
+    private func suggestionRow(to: String, subject: String, snippet: String?,
+                               action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(to.isEmpty ? "—" : to)
+                    .font(.callout.weight(.medium))
+                    .foregroundStyle(Color.primary)
+                    .lineLimit(1)
+                Text(subject.isEmpty ? "(bez tematu)" : subject)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                if let snippet, !snippet.isEmpty {
+                    Text(snippet)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                }
+            }
+        }
+    }
+
+    /// A message from the server's "Wysłane": the subject is known up front,
+    /// the body takes a fetch, and the recipient is matched by name against
+    /// the recipient lists (the folder only shows a name, not a login id).
+    private func fill(from item: MessageItem) async {
+        filling = true
+        defer { filling = false }
+        subject = item.subject
+        if let body = await repo.sentMessageBody(item.id) { text = body }
+        let wanted = Self.words(item.correspondent)
+        guard !wanted.isEmpty else { return }
+        for cat in categories.prefix(4) {
+            guard let people = await repo.loadRecipients(in: cat).list?.people else { continue }
+            if let match = people.first(where: { wanted.isSubset(of: Self.words($0.name)) }) {
+                category = cat
+                selectedPeople = [match]
+                return
+            }
+        }
+    }
+
+    private static func words(_ name: String) -> Set<String> {
+        Set(name.lowercased()
+            .components(separatedBy: CharacterSet.letters.inverted)
+            .filter { !$0.isEmpty })
     }
 
     private func loadCategories() async {
@@ -118,7 +215,7 @@ struct MessageComposeView: View {
         errorText = nil
         Task {
             let failure = await repo.sendMessage(
-                to: selectedPeople.map(\.id), subject: subject, body: text, category: category)
+                to: selectedPeople, subject: subject, body: text, category: category)
             sending = false
             if let failure {
                 errorText = failure

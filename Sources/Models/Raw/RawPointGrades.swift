@@ -18,10 +18,12 @@ struct RawPointGrade: Decodable {
     let category: Ref?
     let addedBy: Ref?
     let subject: Ref?
+    let commentIds: [Int]
 
     enum CodingKeys: String, CodingKey {
         case id = "Id", grade = "Grade", gradeValue = "GradeValue", addDate = "AddDate"
         case semester = "Semester", category = "Category", addedBy = "AddedBy", subject = "Subject"
+        case comments = "Comments"
     }
 
     init(from decoder: Decoder) throws {
@@ -34,6 +36,7 @@ struct RawPointGrade: Decodable {
         category = try? c.decode(Ref.self, forKey: .category)
         addedBy = try? c.decode(Ref.self, forKey: .addedBy)
         subject = try? c.decode(Ref.self, forKey: .subject)
+        commentIds = ((try? c.decode([Ref].self, forKey: .comments)) ?? []).map(\.id)
     }
 }
 

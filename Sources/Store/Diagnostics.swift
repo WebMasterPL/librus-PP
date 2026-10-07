@@ -123,6 +123,8 @@ struct Diagnostics {
             ("Grades/Comments", Librus.Path.gradeComments),
             ("PointGrades", Librus.Path.pointGrades),
             ("PointGrades/Categories", Librus.Path.pointGradeCategories),
+            ("PointGrades/Comments", Librus.Path.pointGradeComments),
+            ("PointGrades/Averages", Librus.Path.pointGradeAverages),
         ]
         var parts: [String] = []
         for (name, path) in endpoints {

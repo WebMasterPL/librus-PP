@@ -256,7 +256,7 @@ actor MessagesClient {
     //   3. POST <form action>    -> requestkey + carried hidden fields + adresat +
     //                               DoKogo[] / DoKogo_hid[] + temat + tresc + wyslij
 
-    struct Recipient: Identifiable, Hashable, Sendable {
+    struct Recipient: Identifiable, Hashable, Sendable, Codable {
         let id: String
         let name: String
         let group: String?
@@ -268,7 +268,7 @@ actor MessagesClient {
         var allowsMultiple: Bool
     }
 
-    struct RecipientCategory: Identifiable, Hashable, Sendable {
+    struct RecipientCategory: Identifiable, Hashable, Sendable, Codable {
         let id: String
         let name: String
         let classID: String?

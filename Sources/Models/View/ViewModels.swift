@@ -27,14 +27,24 @@ struct GradeItem: Identifiable, Codable, Hashable {
     let comment: String?
     /// Top of the scale for a `.point` grade (e.g. 10 for "9/10"); nil otherwise.
     var pointMax: Double? = nil
+    /// The point category's averaging weight (0 = not counted); nil otherwise.
+    var pointWeight: Double? = nil
 
-    var countsToAverage: Bool { kind == .normal && value != nil && weight > 0 }
+    var countsToAverage: Bool {
+        switch kind {
+        case .normal: return value != nil && weight > 0
+        case .point: return value != nil && (pointMax ?? 0) > 0 && (pointWeight ?? 0) > 0
+        default: return false
+        }
+    }
 
     /// `value` on the 1-6 scale `gradeColor` expects — a `.point` grade is
     /// rescaled by its own max first so a "9/10" doesn't get miscoloured as an
-    /// off-the-charts "6".
+    /// off-the-charts "6". 0 points usually means "not handed in yet", so it
+    /// goes grey (nil) rather than alarm-red; it still counts as 0 in averages.
     var colorValue: Double? {
         guard kind == .point, let value, let pointMax, pointMax > 0 else { return value }
+        guard value > 0 else { return nil }
         return 1 + (value / pointMax) * 5
     }
 }
@@ -55,6 +65,11 @@ struct SubjectGrades: Identifiable, Codable, Hashable {
 
     func average(_ filter: SemesterFilter, current: Int) -> Double? {
         GradeMath.weightedAverage(normalGrades(filter, current: current))
+    }
+
+    /// Weighted percentage over point grades: Σ(points·w) / Σ(max·w).
+    func pointPercent(_ filter: SemesterFilter, current: Int) -> Double? {
+        GradeMath.pointPercent(filtered(filter, current: current))
     }
 
     func proposedFinal(_ filter: SemesterFilter, current: Int) -> GradeItem? {

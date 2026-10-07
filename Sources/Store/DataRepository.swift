@@ -51,6 +51,7 @@ final class DataRepository {
     @ObservationIgnored private var rawCategories: [RawGradeCategory] = []
     @ObservationIgnored private var rawPointCategories: [RawPointGradeCategory] = []
     @ObservationIgnored private var rawComments: [RawGradeComment] = []
+    @ObservationIgnored private var rawPointComments: [RawGradeComment] = []
     @ObservationIgnored private var rawLessons: [RawLessonDef] = []
     @ObservationIgnored private var rawAttTypes: [RawAttendanceType] = []
     @ObservationIgnored private var rawNoteCats: [RawNoteCategory] = []
@@ -168,6 +169,7 @@ final class DataRepository {
         SeenGrades.reset()
         Seen.timetableChanges.reset()
         Seen.messageIDs.reset()
+        MessageHistory.clear()
         SharedStore.clear()
         WidgetRefresher.reload()
         timetableWeeks = [:]; lastSync = nil
@@ -273,6 +275,7 @@ final class DataRepository {
             async let gradesT = api.grades()
             async let pointCategoriesT = api.pointGradeCategories()
             async let pointGradesT = api.pointGrades()
+            async let pointCommentsT = api.pointGradeComments()
             async let lessonsT = api.lessons()
             async let attTypesT = api.attendanceTypes()
             async let attsT = api.attendances()
@@ -293,6 +296,7 @@ final class DataRepository {
             if let v = await categoriesT { rawCategories = v }
             if let v = await commentsT { rawComments = v }
             if let v = await pointCategoriesT { rawPointCategories = v }
+            if let v = await pointCommentsT { rawPointComments = v }
             if let v = await lessonsT { rawLessons = v }
             if let v = await attTypesT { rawAttTypes = v }
             if let v = await noteCategoriesT { rawNoteCats = v }
@@ -308,6 +312,7 @@ final class DataRepository {
             let categoryByID = Dictionary(rawCategories.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
             let pointCategoryByID = Dictionary(rawPointCategories.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
             let commentByID = Dictionary(rawComments.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+            let pointCommentByID = Dictionary(rawPointComments.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
             let lessonByID = Dictionary(rawLessons.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
             let attTypeByID = Dictionary(rawAttTypes.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
             let noteCatByID = Dictionary(rawNoteCats.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
@@ -346,7 +351,7 @@ final class DataRepository {
                     grades ?? [], pointGrades: pointGrades ?? [],
                     subjectByID: subjectByID, userByID: userByID,
                     categoryByID: categoryByID, commentByID: commentByID,
-                    pointCategoryByID: pointCategoryByID
+                    pointCategoryByID: pointCategoryByID, pointCommentByID: pointCommentByID
                 )
                 if !SeenGrades.hasBaseline {
                     SeenGrades.establishBaseline(allGradeIDs)
@@ -558,21 +563,33 @@ final class DataRepository {
 
     /// Sends a reply. Returns nil on success, or an error message to show the user.
     func sendReply(to recipientLoginId: String, subject: String, body: String) async -> String? {
-        await sendMessage(to: [recipientLoginId], subject: subject, body: body, category: nil)
+        // No display name here, so a reply isn't kept as a compose suggestion.
+        await sendMessage(to: [.init(id: recipientLoginId, name: "", group: nil)],
+                          subject: subject, body: body, category: nil)
     }
 
     /// Sends a new message. Returns nil on success, or an error message to show.
-    func sendMessage(to recipientIDs: [String], subject: String, body: String,
+    func sendMessage(to recipients: [MessagesClient.Recipient], subject: String, body: String,
                      category: MessagesClient.RecipientCategory?) async -> String? {
         do {
             let cat = category.map { (field: "adresat", id: $0.id) }
-            try await messages.send(recipientLoginIds: recipientIDs, subject: subject, body: body,
+            try await messages.send(recipientLoginIds: recipients.map(\.id), subject: subject, body: body,
                                     recipientField: "DoKogo[]", category: cat)
+            if !recipients.contains(where: { $0.name.isEmpty }) {
+                MessageHistory.record(.init(sentAt: Date(), recipients: recipients, category: category,
+                                            subject: subject, body: body))
+            }
             await loadMessages()
             return nil
         } catch {
             return (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
+    }
+
+    /// Body of a message already in the "Wysłane" folder — for reusing it in a
+    /// new message.
+    func sentMessageBody(_ id: Int) async -> String? {
+        try? await messages.content(messageId: id, folder: .sent).text
     }
 
     /// Step 1 of composing: recipient categories (Nauczyciele, Wychowawcy…).
@@ -639,7 +656,8 @@ final class DataRepository {
         userByID: [Int: RawUser],
         categoryByID: [Int: RawGradeCategory],
         commentByID: [Int: RawGradeComment],
-        pointCategoryByID: [Int: RawPointGradeCategory] = [:]
+        pointCategoryByID: [Int: RawPointGradeCategory] = [:],
+        pointCommentByID: [Int: RawGradeComment] = [:]
     ) -> [SubjectGrades] {
         var bySubject: [Int: SubjectGrades] = [:]
         for g in grades {
@@ -693,17 +711,20 @@ final class DataRepository {
                 return "\(GradeMath.formatPoint(value))/\(GradeMath.formatPoint(max))"
             }()
 
+            let comment = g.commentIds.compactMap { pointCommentByID[$0]?.text }
+                .filter { !$0.isEmpty }.joined(separator: " • ")
+
             let item = GradeItem(
-                // Weight isn't the point max (see above) and the UI has no other
-                // use for it on a point grade, so it's dropped rather than shown
-                // as a confusing, unrelated "waga" number.
+                // `weight` stays 0 so the 1-6 average and the "waga" label skip
+                // it; the category's own weight goes to `pointWeight` instead.
                 id: -g.id, raw: raw, value: value, weight: 0,
                 semester: g.semester, kind: .point,
                 categoryName: category?.name ?? "",
                 teacherName: g.addedBy.flatMap { userByID[$0.id]?.displayName } ?? "",
                 subjectId: subjId, subjectName: subjName,
                 date: LibrusDate.fromISO(g.addDate),
-                comment: nil, pointMax: max
+                comment: comment.isEmpty ? nil : comment, pointMax: max,
+                pointWeight: category?.effectiveWeight ?? 1
             )
             bySubject[subjId, default: SubjectGrades(subjectId: subjId, subjectName: subjName, grades: [])]
                 .grades.append(item)

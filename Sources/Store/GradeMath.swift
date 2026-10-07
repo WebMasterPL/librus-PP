@@ -38,6 +38,22 @@ enum GradeMath {
         return valueSum / weightSum
     }
 
+    /// Weighted percentage (0-100) over `.point` grades: Σ(points·w) / Σ(max·w).
+    static func pointPercent(_ grades: [GradeItem]) -> Double? {
+        var got = 0.0, possible = 0.0
+        for g in grades where g.kind == .point && g.countsToAverage {
+            guard let v = g.value, let max = g.pointMax, let w = g.pointWeight else { continue }
+            got += v * w
+            possible += max * w
+        }
+        guard possible > 0 else { return nil }
+        return got / possible * 100
+    }
+
+    static func formatPercent(_ value: Double) -> String {
+        String(format: "%.0f%%", value)
+    }
+
     static func arithmeticAverage(_ grades: [GradeItem]) -> Double? {
         let values = grades.compactMap(\.value)
         guard !values.isEmpty else { return nil }
