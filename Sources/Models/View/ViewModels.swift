@@ -189,6 +189,38 @@ struct AttendanceSummary: Codable, Hashable {
     }
 }
 
+/// One subject's share of absences. Librus records an entry for every lesson
+/// (presence included), so `total` is the number of lessons with attendance.
+struct SubjectAttendance: Identifiable, Hashable {
+    var id: String { subject }
+    let subject: String
+    let total: Int
+    let absent: Int
+    let excused: Int
+    let belated: Int
+
+    var absences: Int { absent + excused }
+    var absencePercent: Double { total > 0 ? Double(absences) / Double(total) * 100 : 0 }
+
+    /// Highest absence share first; subjects with no absences come last, by name.
+    static func group(_ items: [AttendanceItem]) -> [SubjectAttendance] {
+        Dictionary(grouping: items.filter { $0.subjectName != nil }) { $0.subjectName ?? "" }
+            .map { name, entries in
+                SubjectAttendance(
+                    subject: name, total: entries.count,
+                    absent: entries.filter { $0.kind == .absent }.count,
+                    excused: entries.filter { $0.kind == .absentExcused }.count,
+                    belated: entries.filter { $0.kind == .belated }.count
+                )
+            }
+            .sorted {
+                $0.absencePercent != $1.absencePercent
+                    ? $0.absencePercent > $1.absencePercent
+                    : $0.subject.localizedCaseInsensitiveCompare($1.subject) == .orderedAscending
+            }
+    }
+}
+
 // MARK: - Announcements / homework / lucky number
 
 struct AnnouncementItem: Identifiable, Codable, Hashable {

@@ -16,26 +16,8 @@ struct AttendanceView: View {
         return s
     }
 
-    private struct SubjectAttendance: Identifiable {
-        let id = UUID()
-        let subject: String
-        let absent: Int
-        let excused: Int
-        let belated: Int
-    }
-
     private var bySubject: [SubjectAttendance] {
-        let named = items.filter { $0.subjectName != nil }
-        let groups: [String: [AttendanceItem]] = Dictionary(grouping: named) { $0.subjectName ?? "" }
-        var rows: [SubjectAttendance] = []
-        for (name, entries) in groups {
-            let absent = entries.filter { $0.kind == .absent }.count
-            let excused = entries.filter { $0.kind == .absentExcused }.count
-            let belated = entries.filter { $0.kind == .belated }.count
-            guard absent + excused + belated > 0 else { continue }
-            rows.append(SubjectAttendance(subject: name, absent: absent, excused: excused, belated: belated))
-        }
-        return rows.sorted { ($0.absent + $0.belated) > ($1.absent + $1.belated) }
+        SubjectAttendance.group(items)
     }
 
     var body: some View {
@@ -62,17 +44,17 @@ struct AttendanceView: View {
                 }
 
                 if !bySubject.isEmpty {
-                    SectionCard("Wg przedmiotów", systemImage: "list.bullet") {
-                        VStack(spacing: Theme.Space.sm) {
+                    SectionCard("Nieobecności wg przedmiotów", systemImage: "list.bullet") {
+                        VStack(spacing: Theme.Space.md) {
                             ForEach(bySubject) { row in
-                                HStack {
-                                    Text(row.subject).font(.callout).lineLimit(1)
-                                    Spacer(minLength: Theme.Space.sm)
-                                    if row.absent > 0 { Pill(text: "\(row.absent) nb", color: .negative, prominent: false) }
-                                    if row.excused > 0 { Pill(text: "\(row.excused) u", color: .warning, prominent: false) }
-                                    if row.belated > 0 { Pill(text: "\(row.belated) sp", color: .info, prominent: false) }
-                                }
+                                subjectRow(row)
+                                    .accessibilityElement(children: .ignore)
+                                    .accessibilityLabel("\(row.subject): \(row.absences) z \(row.total) lekcji, \(Int(row.absencePercent.rounded())) procent")
                             }
+                            Text("Procent = nieobecności (nieusprawiedliwione i usprawiedliwione) ze wszystkich lekcji z zapisaną frekwencją. Powyżej 50% grozi nieklasyfikowanie z przedmiotu.")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
                 }
@@ -98,6 +80,32 @@ struct AttendanceView: View {
         .navigationTitle("Frekwencja")
         .refreshable { await repo.refreshCore() }
         .animation(Theme.Motion.quick, value: filter)
+    }
+
+    private func subjectRow(_ row: SubjectAttendance) -> some View {
+        let color: Color = row.absencePercent >= 50 ? .negative
+            : row.absencePercent >= 25 ? .warning : .positive
+        return VStack(alignment: .leading, spacing: 5) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(row.subject).font(.callout).lineLimit(1)
+                Spacer(minLength: Theme.Space.sm)
+                Text(String(format: "%.0f%%", row.absencePercent))
+                    .font(.callout.weight(.bold))
+                    .fontDesign(.rounded)
+                    .foregroundStyle(color)
+            }
+            ProgressView(value: min(row.absencePercent, 100), total: 100)
+                .tint(color)
+            HStack(spacing: Theme.Space.sm) {
+                Text("\(row.absences) z \(row.total) lekcji")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: Theme.Space.sm)
+                if row.absent > 0 { Pill(text: "\(row.absent) nb", color: .negative, prominent: false) }
+                if row.excused > 0 { Pill(text: "\(row.excused) u", color: .warning, prominent: false) }
+                if row.belated > 0 { Pill(text: "\(row.belated) sp", color: .info, prominent: false) }
+            }
+        }
     }
 
     private func entryRow(_ item: AttendanceItem) -> some View {
