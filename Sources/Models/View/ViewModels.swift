@@ -93,23 +93,40 @@ struct TimetableEntry: Identifiable, Codable, Hashable {
     let classroom: String?
     /// Set only when the room differs from the originally planned one.
     let originalClassroom: String?
-    /// Set only for a substitution lesson moved here from a different day —
-    /// i.e. `RawLesson.orgDate` differs from this entry's own day.
-    let originalDate: Date?
+    /// This lesson was moved here from another slot (same day or not).
+    var movedFrom: LessonSlot? = nil
+    /// This lesson was moved away from this slot — it doesn't take place here.
+    var movedTo: LessonSlot? = nil
     /// The regularly-assigned teacher being covered for — set only when a
-    /// substitution genuinely swapped teachers (`RawLesson.orgTeacher` differs
-    /// from `teacher`). `teacher` above is whoever is actually taking the lesson.
+    /// substitution genuinely swapped teachers. `teacher` above is whoever is
+    /// actually taking the lesson.
     let originalTeacher: String?
+    /// The subject originally planned in this slot, when a change swapped it.
+    var originalSubject: String? = nil
     let isCancelled: Bool
     let isSubstitution: Bool
-    let note: String?
+    /// Ready-to-show one-line summary of the change (badge text).
+    var note: String?
 
     var roomChanged: Bool {
         guard let originalClassroom, let classroom else { return false }
         return !originalClassroom.isEmpty && originalClassroom != classroom
     }
 
-    var isMoved: Bool { originalDate != nil }
+    enum ChangeKind { case none, cancelled, movedAway, movedHere, substitution, roomOnly }
+
+    var changeKind: ChangeKind {
+        if movedTo != nil { return .movedAway }
+        if isCancelled { return .cancelled }
+        if movedFrom != nil { return .movedHere }
+        if isSubstitution {
+            return originalTeacher == nil && originalSubject == nil && roomChanged ? .roomOnly : .substitution
+        }
+        return .none
+    }
+
+    /// Not happening in this slot (cancelled or moved elsewhere).
+    var isGone: Bool { isCancelled || movedTo != nil }
 
     var startMinutes: Int? { LibrusDate.minutesOfDay(start) }
     var endMinutes: Int? { LibrusDate.minutesOfDay(end) }
@@ -123,6 +140,14 @@ struct TimetableEntry: Identifiable, Codable, Hashable {
         guard let s = startMinutes else { return false }
         return s > nowMinutes
     }
+}
+
+/// One place in the timetable: a day plus, when Librus gives it, the lesson
+/// number and start time.
+struct LessonSlot: Codable, Hashable {
+    let date: Date
+    let lessonNo: Int?
+    let start: String?
 }
 
 struct TimetableDay: Identifiable, Codable, Hashable {

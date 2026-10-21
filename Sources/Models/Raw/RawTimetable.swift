@@ -25,6 +25,14 @@ struct RawTimetableResponse: Decodable {
     }
 }
 
+/// How Librus encodes changes (matches szkolny-eu's `LibrusApiTimetables.kt`):
+/// - `IsSubstitutionClass` + `IsCanceled`: the lesson was moved away from this
+///   slot; `New*` says where to.
+/// - `IsSubstitutionClass` only: `Org*` is the original slot. Same date and
+///   lesson number = a change in place (teacher/subject/room); anything else =
+///   the lesson was moved here from there.
+/// - `IsCanceled` only: plain cancellation.
+/// `Org*`/`New*` subject and teacher refs may carry only an `Id`.
 struct RawLesson: Decodable {
     let lessonNo: Int?
     let hourFrom: String?
@@ -35,16 +43,26 @@ struct RawLesson: Decodable {
     let isSubstitution: Bool
     let isCancelled: Bool
     let orgDate: String?
+    let orgLessonNo: Int?
+    let orgHourFrom: String?
     let orgSubject: NamedRef?
     let orgTeacher: PersonRef?
     let orgClassroom: NamedRef?
+    let newDate: String?
+    let newLessonNo: Int?
+    let newHourFrom: String?
+    let newSubject: NamedRef?
+    let newTeacher: PersonRef?
+    let newClassroom: NamedRef?
 
     enum CodingKeys: String, CodingKey {
         case lessonNo = "LessonNo", hourFrom = "HourFrom", hourTo = "HourTo"
         case subject = "Subject", teacher = "Teacher", classroom = "Classroom"
         case isSubstitution = "IsSubstitutionClass", isCancelled = "IsCanceled"
-        case orgDate = "OrgDate", orgSubject = "OrgSubject", orgTeacher = "OrgTeacher"
-        case orgClassroom = "OrgClassroom"
+        case orgDate = "OrgDate", orgLessonNo = "OrgLessonNo", orgHourFrom = "OrgHourFrom"
+        case orgSubject = "OrgSubject", orgTeacher = "OrgTeacher", orgClassroom = "OrgClassroom"
+        case newDate = "NewDate", newLessonNo = "NewLessonNo", newHourFrom = "NewHourFrom"
+        case newSubject = "NewSubject", newTeacher = "NewTeacher", newClassroom = "NewClassroom"
     }
 
     init(from decoder: Decoder) throws {
@@ -58,9 +76,17 @@ struct RawLesson: Decodable {
         isSubstitution = (try? c.decode(Bool.self, forKey: .isSubstitution)) ?? false
         isCancelled = (try? c.decode(Bool.self, forKey: .isCancelled)) ?? false
         orgDate = try? c.decode(String.self, forKey: .orgDate)
+        orgLessonNo = c.decodeFlexInt(.orgLessonNo)
+        orgHourFrom = try? c.decode(String.self, forKey: .orgHourFrom)
         orgSubject = try? c.decode(NamedRef.self, forKey: .orgSubject)
         orgTeacher = try? c.decode(PersonRef.self, forKey: .orgTeacher)
         orgClassroom = try? c.decode(NamedRef.self, forKey: .orgClassroom)
+        newDate = try? c.decode(String.self, forKey: .newDate)
+        newLessonNo = c.decodeFlexInt(.newLessonNo)
+        newHourFrom = try? c.decode(String.self, forKey: .newHourFrom)
+        newSubject = try? c.decode(NamedRef.self, forKey: .newSubject)
+        newTeacher = try? c.decode(PersonRef.self, forKey: .newTeacher)
+        newClassroom = try? c.decode(NamedRef.self, forKey: .newClassroom)
     }
 }
 

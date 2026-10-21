@@ -94,19 +94,19 @@ final class MessagesParsingTests: XCTestCase {
         XCTAssertEqual(items.first?.id, 123)
     }
 
-    /// Real markup shape captured from the Terminarz calendar 2026-09-29 —
+    /// Markup shape of the Terminarz calendar (names made up) —
     /// each day is a `kalendarz-numer-dnia` marker followed by a nested table of
     /// colour-coded rows; only the pink "Nieobecność" ones are teacher absences.
     func testParsesTerminarzAbsences() {
         let html = """
         <td class="center"><div class="kalendarz-dzien"><div class="kalendarz-numer-dnia">11</div><table><tbody>\
-        <tr><td class="no-border-left no-border-right" style="background-color: rgb(255, 120, 120); color: rgb(49, 51, 50);" onclick="location.href='/terminarz/szczegoly_wolne/3704850'">Nieobecność:<br>Nauczyciel: Pytel Renata<br>Godziny: 11:30 do 12:15 </td></tr>\
-        <tr><td class="no-border-left no-border-right" style="background-color: rgb(255, 120, 120); color: rgb(49, 51, 50);" onclick="location.href='/terminarz/szczegoly_wolne/3695339'">Nieobecność:<br>Nauczyciel: Warchał Wojciech</td></tr>\
-        <tr><td class="no-border-right no-border-left" style="background-color: rgb(106, 150, 4); color: rgb(255, 255, 255);">Zastępstwo z Katarzyna Chmiel na lekcji nr: 5 (Wychowanie fizyczne)</td></tr>\
+        <tr><td class="no-border-left no-border-right" style="background-color: rgb(255, 120, 120); color: rgb(49, 51, 50);" onclick="location.href='/terminarz/szczegoly_wolne/1001'">Nieobecność:<br>Nauczyciel: Kowalska Anna<br>Godziny: 11:30 do 12:15 </td></tr>\
+        <tr><td class="no-border-left no-border-right" style="background-color: rgb(255, 120, 120); color: rgb(49, 51, 50);" onclick="location.href='/terminarz/szczegoly_wolne/1002'">Nieobecność:<br>Nauczyciel: Nowak Piotr</td></tr>\
+        <tr><td class="no-border-right no-border-left" style="background-color: rgb(106, 150, 4); color: rgb(255, 255, 255);">Zastępstwo z Maria Zielińska na lekcji nr: 5 (Wychowanie fizyczne)</td></tr>\
         </tbody></table></div></td>
         <td class="center weekend"><div class="kalendarz-dzien"><div class="kalendarz-numer-dnia">12</div></div></td>
         <td class="center"><div class="kalendarz-dzien"><div class="kalendarz-numer-dnia">13</div><table><tbody>\
-        <tr><td class="no-border-left no-border-right" style="background-color: rgb(255, 120, 120); color: rgb(49, 51, 50);" onclick="location.href='/terminarz/szczegoly_wolne/3695336'">Nieobecność:<br>Nauczyciel: Galant Krystyna</td></tr>\
+        <tr><td class="no-border-left no-border-right" style="background-color: rgb(255, 120, 120); color: rgb(49, 51, 50);" onclick="location.href='/terminarz/szczegoly_wolne/1003'">Nieobecność:<br>Nauczyciel: Wiśniewska Ewa</td></tr>\
         </tbody></table></div></td>
         """
         let items = MessagesClient.parseTerminarzAbsences(html)
@@ -114,41 +114,41 @@ final class MessagesParsingTests: XCTestCase {
 
         let day11 = items.filter { $0.dayOfMonth == 11 }
         XCTAssertEqual(day11.count, 2)
-        XCTAssertEqual(day11.first?.teacherName, "Pytel Renata")
+        XCTAssertEqual(day11.first?.teacherName, "Kowalska Anna")
         XCTAssertEqual(day11.first?.timeFrom, "11:30")
         XCTAssertEqual(day11.first?.timeTo, "12:15")
-        XCTAssertEqual(day11.last?.teacherName, "Warchał Wojciech")
+        XCTAssertEqual(day11.last?.teacherName, "Nowak Piotr")
         XCTAssertNil(day11.last?.timeFrom)
 
         XCTAssertTrue(items.contains { $0.dayOfMonth == 12 } == false)
 
         let day13 = items.filter { $0.dayOfMonth == 13 }
         XCTAssertEqual(day13.count, 1)
-        XCTAssertEqual(day13.first?.teacherName, "Galant Krystyna")
+        XCTAssertEqual(day13.first?.teacherName, "Wiśniewska Ewa")
     }
 
     /// Regression: a real `POST /terminarz` response (confirmed live
     /// 2026-09-30) renders self-closing `<br />`, not the bare `<br>` the first
     /// capture above used — the old pattern matched zero rows against this,
-    /// silently (no error), which is why the summary stayed empty. Verbatim
-    /// excerpt (day 1) also carries "Odwołane zajęcia" and a homework entry in
+    /// silently (no error), which is why the summary stayed empty. The day-1
+    /// excerpt (names and ids made up) also carries "Odwołane zajęcia" and a homework entry in
     /// the same cell, to confirm those still get skipped.
     func testParsesTerminarzAbsencesWithSelfClosingBr() {
         let html = """
         <td class="center today " ><div class="kalendarz-dzien"><div class="kalendarz-numer-dnia">1</div><table><tbody>\
-        <tr><td class="no-border-left no-border-right" style="background-color: #FF7878; " onclick="location.href='/terminarz/szczegoly_wolne/3706745'" >Nieobecność:<br />Nauczyciel: Galant Krystyna</td></tr>\
-        <tr><td class="no-border-left no-border-right" style="background-color: #FF7878; " onclick="location.href='/terminarz/szczegoly_wolne/3738786'" >Nieobecność:<br />Nauczyciel: Mazur Marcin<br />Godziny: 11:30 do 12:15 </td></tr>\
+        <tr><td class="no-border-left no-border-right" style="background-color: #FF7878; " onclick="location.href='/terminarz/szczegoly_wolne/1004'" >Nieobecność:<br />Nauczyciel: Wiśniewska Ewa</td></tr>\
+        <tr><td class="no-border-left no-border-right" style="background-color: #FF7878; " onclick="location.href='/terminarz/szczegoly_wolne/1005'" >Nieobecność:<br />Nauczyciel: Wójcik Tomasz<br />Godziny: 11:30 do 12:15 </td></tr>\
         <tr><td style="background-color: #6A9604; " >
-                            Odwołane zajęcia <br>Marcin Lasak na lekcji nr: 0 (Specjalizacja)
+                            Odwołane zajęcia <br>Tomasz Lewandowski na lekcji nr: 0 (Fizyka)
                             </td></tr>\
-        <tr><td class="no-border-left no-border-right" style="background-color: #32CD32; cursor: pointer;" title="Nauczyciel: Janecki Marian" onclick="location.href='/terminarz/szczegoly/13939037'">Nr lekcji: 5<br /><span class="przedmiot">Historia</span>, sprawdzian<br />5in T4<br/>Sala:&nbsp;305</td></tr>\
+        <tr><td class="no-border-left no-border-right" style="background-color: #32CD32; cursor: pointer;" title="Nauczyciel: Kaczmarek Jan" onclick="location.href='/terminarz/szczegoly/2001'">Nr lekcji: 5<br /><span class="przedmiot">Historia</span>, sprawdzian<br />2a<br/>Sala:&nbsp;12</td></tr>\
         </tbody></table></div></td>
         """
         let items = MessagesClient.parseTerminarzAbsences(html)
         XCTAssertEqual(items.count, 2)
-        XCTAssertEqual(items[0].teacherName, "Galant Krystyna")
+        XCTAssertEqual(items[0].teacherName, "Wiśniewska Ewa")
         XCTAssertNil(items[0].timeFrom)
-        XCTAssertEqual(items[1].teacherName, "Mazur Marcin")
+        XCTAssertEqual(items[1].teacherName, "Wójcik Tomasz")
         XCTAssertEqual(items[1].timeFrom, "11:30")
         XCTAssertEqual(items[1].timeTo, "12:15")
     }
@@ -162,10 +162,10 @@ final class MessagesParsingTests: XCTestCase {
     }
 
     func testTeacherNameKeyIgnoresWordOrder() {
-        XCTAssertEqual(TimetableView.nameKey("Lasak Marcin"), TimetableView.nameKey("Marcin Lasak"))
-        XCTAssertEqual(TimetableView.nameKey("Stelmaszczyk-Stawowy Honorata"),
-                       TimetableView.nameKey("Honorata  Stelmaszczyk-Stawowy"))
-        XCTAssertNotEqual(TimetableView.nameKey("Lasak Marcin"), TimetableView.nameKey("Mazur Marcin"))
+        XCTAssertEqual(TimetableView.nameKey("Lewandowski Tomasz"), TimetableView.nameKey("Tomasz Lewandowski"))
+        XCTAssertEqual(TimetableView.nameKey("Kamińska-Dąbrowska Joanna"),
+                       TimetableView.nameKey("Joanna  Kamińska-Dąbrowska"))
+        XCTAssertNotEqual(TimetableView.nameKey("Lewandowski Tomasz"), TimetableView.nameKey("Wójcik Tomasz"))
     }
 
     func testRecoversWhenSenderCellIsAHeaderLabel() {

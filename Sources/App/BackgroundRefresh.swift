@@ -159,8 +159,10 @@ enum BackgroundRefresh {
                     let subject = lesson.subject?.name ?? "lekcja"
                     let signature = "\(dateStr)#\(no)#\(kind)#\(subject)"
                     signatures.insert(signature)
-                    labelBySignature[signature] =
-                        "\(date.dayMonthShort): \(kind == "C" ? "odwołane" : "zastępstwo") — \(subject) (lekcja \(no))"
+                    let what = TimetableMapping.entry(from: lesson, date: date, idSuffix: "",
+                                                      lookups: .init())?.note
+                        ?? (kind == "C" ? "Lekcja odwołana" : "Zastępstwo")
+                    labelBySignature[signature] = "\(date.dayMonthShort): \(subject) (lekcja \(no)) — \(what)"
                 }
             }
         }

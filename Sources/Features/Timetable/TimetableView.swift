@@ -237,7 +237,8 @@ struct TimetableView: View {
 
         // Substitutions stay out: a swapped teacher or a moved lesson isn't
         // proof anyone is absent — only the Terminarz list says that.
-        for entry in day.entries where entry.isCancelled {
+        // A lesson moved elsewhere isn't a sign of absence either.
+        for entry in day.entries where entry.changeKind == .cancelled {
             guard let name = entry.teacher, seenTeachers.insert(Self.nameKey(name)).inserted else { continue }
             out.append(DayAbsence(id: "lesson-\(entry.id)", teacherName: name,
                                   lessonNo: entry.lessonNo, subject: entry.subject, timeRange: nil))
@@ -308,8 +309,8 @@ struct LessonRow: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(entry.subject)
                     .font(.callout.weight(.medium))
-                    .strikethrough(entry.isCancelled)
-                    .foregroundStyle(entry.isCancelled ? .secondary : .primary)
+                    .strikethrough(entry.isGone)
+                    .foregroundStyle(entry.isGone ? .secondary : .primary)
                 HStack(spacing: Theme.Space.sm) {
                     if let teacher = entry.teacher { Text(teacher) }
                     roomLabel
@@ -317,18 +318,26 @@ struct LessonRow: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-                if entry.isCancelled {
-                    badge("Lekcja odwołana", .negative, "xmark.circle.fill")
-                } else if entry.isMoved {
-                    badge(entry.note ?? "Przeniesiona", .info, "arrow.turn.up.right")
-                } else if entry.isSubstitution {
-                    badge(entry.note ?? "Zastępstwo", .warning, "arrow.triangle.2.circlepath")
+                if let style = Self.badgeStyle(entry.changeKind) {
+                    badge(entry.note ?? style.fallback, style.color, style.icon)
                 }
             }
             Spacer(minLength: 0)
         }
         .padding(.vertical, Theme.Space.sm)
-        .opacity(entry.isCancelled ? 0.65 : 1)
+        .opacity(entry.isGone ? 0.65 : 1)
+    }
+
+    static func badgeStyle(_ kind: TimetableEntry.ChangeKind)
+        -> (color: Color, icon: String, fallback: String)? {
+        switch kind {
+        case .cancelled: return (Color.negative, "xmark.circle.fill", "Lekcja odwołana")
+        case .movedAway: return (Color.info, "arrow.turn.up.right", "Przeniesiona")
+        case .movedHere: return (Color.info, "arrow.turn.down.right", "Przeniesiona")
+        case .substitution: return (Color.warning, "arrow.triangle.2.circlepath", "Zastępstwo")
+        case .roomOnly: return (Color.warning, "arrow.left.arrow.right", "Zmiana sali")
+        case .none: return nil
+        }
     }
 
     @ViewBuilder private var roomLabel: some View {
@@ -368,8 +377,7 @@ struct LessonDetailView: View {
     @Environment(\.dismiss) private var dismiss
 
     private var hasChange: Bool {
-        entry.isCancelled || entry.isSubstitution || entry.roomChanged
-            || !(entry.note ?? "").isEmpty
+        entry.changeKind != .none || entry.roomChanged
     }
 
     var body: some View {
@@ -401,30 +409,25 @@ struct LessonDetailView: View {
 
                 if hasChange {
                     Section("Zmiany") {
-                        if entry.isCancelled {
-                            Label("Lekcja odwołana", systemImage: "xmark.circle.fill")
-                                .foregroundStyle(Color.negative)
+                        if let style = LessonRow.badgeStyle(entry.changeKind) {
+                            Label(entry.note ?? style.fallback, systemImage: style.icon)
+                                .foregroundStyle(style.color)
                         }
-                        if entry.isMoved {
-                            Label("Przeniesiona", systemImage: "arrow.turn.up.right")
-                                .foregroundStyle(Color.info)
-                        } else if entry.isSubstitution {
-                            Label("Zastępstwo", systemImage: "arrow.triangle.2.circlepath")
-                                .foregroundStyle(Color.warning)
+                        if let slot = entry.movedTo {
+                            KeyValueRow(key: "Nowy termin", value: slotText(slot))
                         }
-                        if let orgDate = entry.originalDate {
-                            KeyValueRow(key: "Pierwotny termin",
-                                        value: "\(orgDate.weekdayName.capitalized), \(orgDate.dayMonthYear)")
+                        if let slot = entry.movedFrom {
+                            KeyValueRow(key: "Pierwotny termin", value: slotText(slot))
                         }
                         if let originalTeacher = entry.originalTeacher {
                             KeyValueRow(key: "Zastępstwo za", value: originalTeacher)
                         }
-                        if entry.roomChanged {
+                        if let originalSubject = entry.originalSubject {
+                            KeyValueRow(key: "Pierwotny przedmiot", value: originalSubject)
+                        }
+                        if entry.roomChanged, entry.changeKind != .roomOnly {
                             Label("Zmiana sali", systemImage: "arrow.left.arrow.right")
                                 .foregroundStyle(Color.warning)
-                        }
-                        if let note = entry.note, !note.isEmpty {
-                            Text(note).font(.callout).textSelection(.enabled)
                         }
                     }
                 }
@@ -441,6 +444,13 @@ struct LessonDetailView: View {
             }
         }
         .presentationDetents([.medium, .large])
+    }
+
+    private func slotText(_ slot: LessonSlot) -> String {
+        var parts = ["\(slot.date.weekdayName.capitalized), \(slot.date.dayMonthYear)"]
+        if let n = slot.lessonNo { parts.append("lekcja \(n)") }
+        if let s = slot.start { parts.append(s) }
+        return parts.joined(separator: " · ")
     }
 
     private var length: Int? {

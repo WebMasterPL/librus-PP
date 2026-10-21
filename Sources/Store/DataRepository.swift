@@ -98,6 +98,8 @@ final class DataRepository {
 
     // MARK: - Cache
 
+    private static let timetableCacheName = "timetable-v2"
+
     private struct Snapshot: Codable {
         var studentName: String
         var schoolYear: SchoolYearInfo
@@ -137,7 +139,10 @@ final class DataRepository {
         readAnnouncementIDs = Set(s.readAnnouncementIDs)
         readMessageIDs = Set(s.readMessageIDs ?? [])
         classroomNameByID = s.classroomNames ?? [:]
-        if let cachedWeeks = Cache.load([String: [TimetableDay]].self, from: "timetable") {
+        // Bump the name whenever entries built by an older `TimetableMapping`
+        // would show wrong: a cached week is never re-fetched on its own.
+        Cache.remove("timetable")
+        if let cachedWeeks = Cache.load([String: [TimetableDay]].self, from: Self.timetableCacheName) {
             timetableWeeks = cachedWeeks
         }
     }
@@ -156,7 +161,7 @@ final class DataRepository {
             classroomNames: classroomNameByID
         )
         Cache.save(snap, as: "snapshot")
-        Cache.save(timetableWeeks, as: "timetable")
+        Cache.save(timetableWeeks, as: Self.timetableCacheName)
     }
 
     func clearLocal() {
@@ -443,13 +448,11 @@ final class DataRepository {
 
     private func fetchTimetable(weekStart: Date, key: String) async throws {
         let raw = try await api.timetable(weekStart: weekStart)
+        let lookups = timetableLookups()
         let days: [TimetableDay] = raw.keys.sorted().compactMap { dateStr in
             guard let date = LibrusDate.fromYMD(dateStr) else { return nil }
-            let slots = raw[dateStr] ?? []
-            let entries: [TimetableEntry] = slots.flatMap { $0 }
-                .compactMap { self.mapLesson($0, date: date) }
-                .sorted { $0.lessonNo < $1.lessonNo }
-            return TimetableDay(date: date, entries: entries)
+            return TimetableDay(date: date, entries: TimetableMapping.entries(
+                for: raw[dateStr] ?? [], date: date, lookups: lookups))
         }
         timetableWeeks[key] = days
         if !Seen.timetableChanges.hasBaseline {
@@ -769,57 +772,12 @@ final class DataRepository {
         return (summary, items)
     }
 
-    private func mapLesson(_ l: RawLesson, date: Date) -> TimetableEntry? {
-        guard let no = l.lessonNo, let from = l.hourFrom, let to = l.hourTo else { return nil }
-        // Librus usually inlines `Classroom.Name`, but some schools return only
-        // `Classroom.Id` — fall back to the `Classrooms` lookup table then.
-        let room = roomName(l.classroom)
-        let orgRoom = roomName(l.orgClassroom)
-        // A substitution whose `OrgDate` is a different day is really a lesson
-        // moved from that day, not a same-day teacher/subject swap.
-        let orgDate = LibrusDate.fromYMD(l.orgDate)
-        let moved = l.isSubstitution && orgDate != nil && !LibrusDate.isSameDay(orgDate!, date)
-        // The absent, regularly-assigned teacher — only meaningful when a
-        // substitution genuinely swapped who's teaching, not e.g. a room-only change.
-        let orgTeacherName = l.orgTeacher?.displayName
-        let originalTeacher = (l.isSubstitution && orgTeacherName != nil
-            && orgTeacherName != l.teacher?.displayName) ? orgTeacherName : nil
-
-        var note: String?
-        if l.isCancelled {
-            note = "Lekcja odwołana"
-        } else if l.isSubstitution {
-            var parts = [moved ? "Przeniesiona" : "Zastępstwo"]
-            if moved, let orgDate {
-                parts.append("(było: \(orgDate.weekdayName.capitalized) \(orgDate.dayMonthShort))")
-            }
-            if let orgName = l.orgSubject?.name, !orgName.isEmpty, orgName != l.subject?.name {
-                parts.append(moved ? "— \(orgName)" : "(było: \(orgName))")
-            }
-            if let originalTeacher { parts.append("za: \(originalTeacher)") }
-            note = parts.joined(separator: " ")
-        }
-        return TimetableEntry(
-            id: "\(no)-\(from)", lessonNo: no, start: from, end: to,
-            subject: l.subject?.name ?? "—",
-            teacher: l.teacher?.displayName,
-            classroom: room,
-            originalClassroom: orgRoom,
-            originalDate: moved ? orgDate : nil,
-            originalTeacher: originalTeacher,
-            isCancelled: l.isCancelled,
-            isSubstitution: l.isSubstitution,
-            note: note
+    private func timetableLookups() -> TimetableMapping.Lookups {
+        TimetableMapping.Lookups(
+            subjectName: Dictionary(rawSubjects.map { ($0.id, $0.name) }, uniquingKeysWith: { a, _ in a }),
+            teacherName: Dictionary(rawUsers.map { ($0.id, $0.displayName) }, uniquingKeysWith: { a, _ in a }),
+            classroomName: classroomNameByID
         )
-    }
-
-    /// Room label for a timetable classroom ref: inline name first, then the
-    /// `Classrooms` lookup by id.
-    private func roomName(_ ref: NamedRef?) -> String? {
-        guard let ref else { return nil }
-        if let name = ref.name, !name.isEmpty { return name }
-        if let mapped = classroomNameByID[ref.id], !mapped.isEmpty { return mapped }
-        return nil
     }
 
     // MARK: - Widget feed
@@ -836,7 +794,7 @@ final class DataRepository {
                     SharedStore.WidgetTimetable.Lesson(
                         id: e.id, lessonNo: e.lessonNo, start: e.start, end: e.end,
                         subject: e.subject, room: e.classroom,
-                        isCancelled: e.isCancelled, isSubstitution: e.isSubstitution,
+                        isCancelled: e.isGone, isSubstitution: e.isSubstitution,
                         roomChanged: e.roomChanged, note: e.note
                     )
                 }

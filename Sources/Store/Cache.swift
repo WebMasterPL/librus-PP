@@ -50,6 +50,10 @@ enum Cache {
         return try? decoder.decode(type, from: data)
     }
 
+    static func remove(_ name: String) {
+        try? FileManager.default.removeItem(at: dir.appendingPathComponent("\(name).json"))
+    }
+
     static func clearAll() {
         try? FileManager.default.removeItem(at: dir)
     }

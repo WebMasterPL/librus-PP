@@ -7,7 +7,7 @@ struct DashboardView: View {
         let key = LibrusDate.ymdString(LibrusDate.weekStart())
         return repo.timetableWeeks[key]?
             .first { LibrusDate.isSameDay($0.date, Date()) }?
-            .entries.filter { !$0.isCancelled } ?? []
+            .entries.filter { !$0.isGone } ?? []
     }
 
     private var currentLesson: TimetableEntry? {
@@ -208,7 +208,7 @@ struct DashboardView: View {
                                 Text(entry.subject)
                                     .font(.callout)
                                     .fontWeight(ongoing ? .medium : .regular)
-                                    .strikethrough(entry.isCancelled)
+                                    .strikethrough(entry.isGone)
                                 Spacer(minLength: Theme.Space.sm)
                                 if entry.roomChanged, let r = entry.classroom {
                                     Chip(text: "→ \(r)", tint: .warning)
