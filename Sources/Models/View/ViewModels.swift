@@ -156,6 +156,36 @@ struct TimetableDay: Identifiable, Codable, Hashable {
     let entries: [TimetableEntry]
 
     var hasLessons: Bool { !entries.isEmpty }
+
+    /// One row per lesson number: what takes place in full, and under it
+    /// whatever it replaced (cancelled or moved away) — two rows with the same
+    /// number read as a duplicate.
+    var lessonGroups: [LessonGroup] {
+        var out: [LessonGroup] = []
+        var i = entries.startIndex
+        while i < entries.endIndex {
+            var j = i
+            while j < entries.endIndex && entries[j].lessonNo == entries[i].lessonNo { j += 1 }
+            let slot = entries[i..<j]
+            var primary = slot.filter { !$0.isGone }
+            var replaced = slot.filter { $0.isGone }
+            if primary.isEmpty { primary = [replaced.removeFirst()] }
+            out.append(LessonGroup(lessonNo: entries[i].lessonNo, primary: primary, replaced: replaced))
+            i = j
+        }
+        return out
+    }
+}
+
+struct LessonGroup: Identifiable, Hashable {
+    var id: String { primary[0].id }
+    let lessonNo: Int
+    /// Never empty; shown in full.
+    let primary: [TimetableEntry]
+    /// Cancelled or moved-away lessons of the same slot, shown compactly.
+    let replaced: [TimetableEntry]
+
+    var lead: TimetableEntry { primary[0] }
 }
 
 // MARK: - Attendance

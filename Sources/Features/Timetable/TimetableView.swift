@@ -158,17 +158,14 @@ struct TimetableView: View {
                     Text("Brak lekcji").font(.subheadline).foregroundStyle(.secondary)
                         .padding(.vertical, Theme.Space.xs)
                 } else {
+                    let groups = day.lessonGroups
                     VStack(spacing: 0) {
-                        ForEach(Array(day.entries.enumerated()), id: \.element.id) { idx, entry in
-                            Button {
+                        ForEach(Array(groups.enumerated()), id: \.element.id) { idx, group in
+                            LessonRow(group: group, highlight: isToday && group.lead.isOngoing()) { entry in
                                 Haptics.tap()
                                 selection = LessonSelection(entry: entry, date: day.date)
-                            } label: {
-                                LessonRow(entry: entry, highlight: isToday && entry.isOngoing())
-                                    .contentShape(Rectangle())
                             }
-                            .buttonStyle(.plain)
-                            if idx < day.entries.count - 1 {
+                            if idx < groups.count - 1 {
                                 Divider().padding(.leading, 58).opacity(0.4)
                             }
                         }
@@ -285,47 +282,94 @@ struct TimetableView: View {
     }
 }
 
+/// One lesson number: the lesson(s) taking place in full, then compact,
+/// struck-through lines for what they replaced. Each part opens its own detail.
 struct LessonRow: View {
-    let entry: TimetableEntry
+    let group: LessonGroup
     var highlight: Bool = false
+    var onSelect: (TimetableEntry) -> Void = { _ in }
+
+    private var lead: TimetableEntry { group.lead }
+    private var isSimple: Bool { group.primary.count == 1 && group.replaced.isEmpty }
 
     var body: some View {
-        HStack(spacing: Theme.Space.md) {
+        HStack(alignment: isSimple ? .center : .top, spacing: Theme.Space.md) {
             VStack(spacing: 1) {
-                Text("\(entry.lessonNo)")
+                Text("\(group.lessonNo)")
                     .font(.headline.weight(.bold))
                     .fontDesign(.rounded)
                     .foregroundStyle(highlight ? AnyShapeStyle(.tint) : AnyShapeStyle(Color.primary))
-                Text(entry.start).font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
-                Text(entry.end).font(.caption2.monospacedDigit()).foregroundStyle(.tertiary)
+                Text(lead.start).font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+                Text(lead.end).font(.caption2.monospacedDigit()).foregroundStyle(.tertiary)
             }
             .frame(width: 46)
+            .opacity(lead.isGone ? 0.65 : 1)
 
             Rectangle()
                 .fill(highlight ? AnyShapeStyle(.tint) : AnyShapeStyle(Color.clear))
                 .frame(width: 3)
                 .clipShape(Capsule())
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(entry.subject)
-                    .font(.callout.weight(.medium))
-                    .strikethrough(entry.isGone)
-                    .foregroundStyle(entry.isGone ? .secondary : .primary)
-                HStack(spacing: Theme.Space.sm) {
-                    if let teacher = entry.teacher { Text(teacher) }
-                    roomLabel
+            VStack(alignment: .leading, spacing: Theme.Space.sm) {
+                ForEach(group.primary) { entry in
+                    Button { onSelect(entry) } label: {
+                        details(entry)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                 }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-                if let style = Self.badgeStyle(entry.changeKind) {
-                    badge(entry.note ?? style.fallback, style.color, style.icon)
+                ForEach(group.replaced) { entry in
+                    Button { onSelect(entry) } label: {
+                        replacedLine(entry)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                 }
             }
-            Spacer(minLength: 0)
         }
         .padding(.vertical, Theme.Space.sm)
+        .contentShape(Rectangle())
+        // The number column has no button of its own.
+        .onTapGesture { onSelect(lead) }
+    }
+
+    private func details(_ entry: TimetableEntry) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(entry.subject)
+                .font(.callout.weight(.medium))
+                .strikethrough(entry.isGone)
+                .foregroundStyle(entry.isGone ? .secondary : .primary)
+            HStack(spacing: Theme.Space.sm) {
+                if let teacher = entry.teacher { Text(teacher) }
+                roomLabel(entry)
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+
+            if let style = Self.badgeStyle(entry.changeKind) {
+                badge(entry.note ?? style.fallback, style.color, style.icon)
+            }
+        }
         .opacity(entry.isGone ? 0.65 : 1)
+    }
+
+    /// e.g. "✕ Matematyka — lekcja odwołana", under the lesson that took its place.
+    private func replacedLine(_ entry: TimetableEntry) -> some View {
+        let style = Self.badgeStyle(entry.changeKind)
+        let note = entry.note ?? style?.fallback ?? ""
+        let suffix: String = note.isEmpty ? "" : " — " + note.prefix(1).lowercased() + String(note.dropFirst())
+        return HStack(alignment: .firstTextBaseline, spacing: 4) {
+            if let style {
+                Image(systemName: style.icon).foregroundStyle(style.color)
+            }
+            Text("\(Text(entry.subject).strikethrough())\(suffix)")
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+        }
+        .font(.caption)
+        .accessibilityElement(children: .combine)
     }
 
     static func badgeStyle(_ kind: TimetableEntry.ChangeKind)
@@ -340,7 +384,7 @@ struct LessonRow: View {
         }
     }
 
-    @ViewBuilder private var roomLabel: some View {
+    @ViewBuilder private func roomLabel(_ entry: TimetableEntry) -> some View {
         if entry.roomChanged, let room = entry.classroom {
             HStack(spacing: 2) {
                 if let org = entry.originalClassroom {

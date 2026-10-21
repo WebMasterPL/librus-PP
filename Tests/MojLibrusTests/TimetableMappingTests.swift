@@ -125,6 +125,34 @@ final class TimetableMappingTests: XCTestCase {
         XCTAssertEqual(e.note, "Zmiana sali")
     }
 
+    /// One row per lesson number: the lesson taking place leads, the cancelled
+    /// one it replaced hangs under it; a slot with only a moved-away lesson
+    /// still gets its own row.
+    func testLessonGroupsOneRowPerNumber() throws {
+        let entries = try day("""
+        [ [
+          { "LessonNo": 4, "HourFrom": "10:35", "HourTo": "11:20",
+            "Subject": { "Id": 3, "Name": "Matematyka" },
+            "IsCanceled": true, "IsSubstitutionClass": false },
+          { "LessonNo": 4, "HourFrom": "10:35", "HourTo": "11:20",
+            "Subject": { "Id": 9, "Name": "Fizyka" },
+            "IsCanceled": false, "IsSubstitutionClass": true,
+            "OrgDate": "2026-10-19", "OrgLessonNo": 7 }
+        ], [
+          { "LessonNo": 7, "HourFrom": "13:25", "HourTo": "14:10",
+            "Subject": { "Id": 9, "Name": "Fizyka" },
+            "IsCanceled": true, "IsSubstitutionClass": true,
+            "NewDate": "2026-10-19", "NewLessonNo": 4 }
+        ] ]
+        """)
+        let groups = TimetableDay(date: Date(), entries: entries).lessonGroups
+        XCTAssertEqual(groups.map(\.lessonNo), [4, 7])
+        XCTAssertEqual(groups[0].primary.map(\.subject), ["Fizyka"])
+        XCTAssertEqual(groups[0].replaced.map(\.subject), ["Matematyka"])
+        XCTAssertEqual(groups[1].lead.changeKind, .movedAway)
+        XCTAssertTrue(groups[1].replaced.isEmpty)
+    }
+
     /// The same lesson listed twice in one slot (e.g. once per group) shows once.
     func testExactDuplicatesAreMerged() throws {
         let lesson = """
