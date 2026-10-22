@@ -277,6 +277,19 @@ struct SubjectAttendance: Identifiable, Hashable {
     }
 }
 
+extension AttendanceItem {
+    /// The newest entries that aren't a plain presence (absences, lates,
+    /// releases, custom types), latest lesson first — the dashboard card.
+    static func recentAbsences(_ items: [AttendanceItem], limit: Int) -> [AttendanceItem] {
+        items.filter { $0.kind != .present }
+            .sorted {
+                let a = $0.date ?? .distantPast, b = $1.date ?? .distantPast
+                return a != b ? a > b : ($0.lessonNo ?? 0) > ($1.lessonNo ?? 0)
+            }
+            .prefix(limit).map { $0 }
+    }
+}
+
 /// One school day's attendance, lessons in order — the "Ostatnie dni" panel.
 struct AttendanceDay: Identifiable, Hashable {
     var id: Date { date }

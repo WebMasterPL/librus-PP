@@ -40,6 +40,21 @@ final class SubjectAttendanceTests: XCTestCase {
         XCTAssertEqual(days[1].notable.map(\.kind), [.belated])
     }
 
+    /// Dashboard card: newest non-presences, the later lesson first on a day.
+    func testRecentAbsences() throws {
+        let tue = try XCTUnwrap(LibrusDate.fromYMD("2026-10-20"))
+        let wed = try XCTUnwrap(LibrusDate.fromYMD("2026-10-21"))
+        let items: [AttendanceItem] = [
+            make(.absent, "Fizyka", date: tue, lessonNo: 2),
+            make(.present, "Matematyka", date: wed, lessonNo: 5),
+            make(.absentExcused, "Historia", date: wed, lessonNo: 1),
+            make(.belated, "Biologia", date: wed, lessonNo: 3),
+            make(.absent, "Chemia", date: tue, lessonNo: 1),
+        ]
+        let recent = AttendanceItem.recentAbsences(items, limit: 3)
+        XCTAssertEqual(recent.map(\.subjectName), ["Biologia", "Historia", "Fizyka"])
+    }
+
     private func make(_ kind: AttendanceKind, _ subject: String?,
                       date: Date = Date(), lessonNo: Int = 1) -> AttendanceItem {
         AttendanceItem(id: Int.random(in: 1...9_999_999), kind: kind, typeName: kind.label,

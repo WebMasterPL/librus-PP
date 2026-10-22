@@ -31,6 +31,10 @@ struct DashboardView: View {
             .prefix(6).map { $0 }
     }
 
+    private var recentAbsences: [AttendanceItem] {
+        AttendanceItem.recentAbsences(repo.attendanceItems, limit: 5)
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: Theme.Space.lg) {
@@ -41,6 +45,7 @@ struct DashboardView: View {
                 nowCard
                 todayCard
                 if !recentGrades.isEmpty { recentGradesCard }
+                if !recentAbsences.isEmpty { recentAbsencesCard }
                 nextEventCard
                 countersRow
 
@@ -263,6 +268,25 @@ struct DashboardView: View {
                         }
                     }
                     .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    // MARK: Recent absences
+
+    private var recentAbsencesCard: some View {
+        SectionCard("Ostatnie nieobecności", systemImage: "person.crop.circle.badge.xmark") {
+            NavigationLink {
+                AttendanceView()
+            } label: {
+                Text("Frekwencja").font(.caption.weight(.semibold))
+            }
+        } content: {
+            VStack(spacing: 0) {
+                ForEach(Array(recentAbsences.enumerated()), id: \.offset) { idx, item in
+                    AttendanceEntryRow(item: item)
+                    if idx < recentAbsences.count - 1 { Divider().opacity(0.4) }
                 }
             }
         }

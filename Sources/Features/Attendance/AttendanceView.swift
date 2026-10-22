@@ -82,7 +82,7 @@ struct AttendanceView: View {
                     SectionCard("Wpisy", systemImage: "clock.arrow.circlepath") {
                         VStack(spacing: 0) {
                             ForEach(Array(items.enumerated()), id: \.element.id) { idx, item in
-                                entryRow(item)
+                                AttendanceEntryRow(item: item)
                                 if idx < items.count - 1 { Divider().opacity(0.4) }
                             }
                         }
@@ -189,10 +189,16 @@ struct AttendanceView: View {
     private func itemColor(_ item: AttendanceItem) -> Color {
         Color(librusHex: item.colorHex) ?? attendanceColor(item.kind)
     }
+}
 
-    private func entryRow(_ item: AttendanceItem) -> some View {
-        let color = itemColor(item)
-        return HStack(spacing: Theme.Space.md) {
+/// One attendance entry: Librus code, subject, type, date and lesson. Shared
+/// by the Frekwencja list and the dashboard card.
+struct AttendanceEntryRow: View {
+    let item: AttendanceItem
+
+    var body: some View {
+        let color = Color(librusHex: item.colorHex) ?? attendanceColor(item.kind)
+        HStack(spacing: Theme.Space.md) {
             Text(item.typeShort)
                 .font(.caption.weight(.bold))
                 .foregroundStyle(color)
