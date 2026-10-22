@@ -20,6 +20,10 @@ struct AttendanceView: View {
         SubjectAttendance.group(items)
     }
 
+    private var recentDays: [AttendanceDay] {
+        AttendanceDay.recent(items, limit: 5)
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: Theme.Space.lg) {
@@ -41,6 +45,17 @@ struct AttendanceView: View {
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                if !recentDays.isEmpty {
+                    SectionCard("Ostatnie dni", systemImage: "calendar") {
+                        VStack(spacing: 0) {
+                            ForEach(Array(recentDays.enumerated()), id: \.element.id) { idx, day in
+                                recentDayRow(day)
+                                if idx < recentDays.count - 1 { Divider().opacity(0.4) }
+                            }
+                        }
+                    }
                 }
 
                 if !bySubject.isEmpty {
@@ -108,8 +123,75 @@ struct AttendanceView: View {
         }
     }
 
+    /// A day at a glance: one chip per lesson (number + Librus code), then a
+    /// line per anything other than a plain presence, naming the subject.
+    private func recentDayRow(_ day: AttendanceDay) -> some View {
+        VStack(alignment: .leading, spacing: Theme.Space.sm) {
+            HStack(alignment: .firstTextBaseline, spacing: Theme.Space.sm) {
+                Text(day.date.weekdayName.capitalized).font(.callout.weight(.semibold))
+                Text(day.date.dayMonthShort).font(.caption).foregroundStyle(.secondary)
+                Spacer(minLength: Theme.Space.sm)
+                if day.notable.isEmpty {
+                    Text("same obecności").font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 34), spacing: 6)], alignment: .leading, spacing: 6) {
+                ForEach(Array(day.items.enumerated()), id: \.offset) { _, item in
+                    lessonChip(item)
+                }
+            }
+            ForEach(Array(day.notable.enumerated()), id: \.offset) { _, item in
+                HStack(spacing: Theme.Space.sm) {
+                    Text(item.lessonNo.map { "\($0)." } ?? "–")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.tertiary)
+                        .frame(width: 22, alignment: .leading)
+                    Text(item.subjectName ?? "—").font(.callout).lineLimit(1)
+                    Spacer(minLength: Theme.Space.sm)
+                    Text(item.typeName)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(itemColor(item))
+                        .lineLimit(1)
+                }
+            }
+        }
+        .padding(.vertical, Theme.Space.sm)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(dayAccessibilityLabel(day))
+    }
+
+    private func lessonChip(_ item: AttendanceItem) -> some View {
+        let color = itemColor(item)
+        return VStack(spacing: 0) {
+            Text(item.lessonNo.map(String.init) ?? "–")
+                .font(.caption2.monospacedDigit())
+                .foregroundStyle(.secondary)
+            Text(item.typeShort)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .frame(width: 34, height: 38)
+        .background(color.opacity(0.16), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private func dayAccessibilityLabel(_ day: AttendanceDay) -> String {
+        let head = "\(day.date.weekdayName), \(day.date.dayMonthShort)"
+        guard !day.notable.isEmpty else { return head + ": same obecności" }
+        let parts = day.notable.map { item in
+            [item.lessonNo.map { "lekcja \($0)" }, item.subjectName, item.typeName]
+                .compactMap { $0 }.joined(separator: " ")
+        }
+        return head + ": " + parts.joined(separator: ", ")
+    }
+
+    private func itemColor(_ item: AttendanceItem) -> Color {
+        Color(librusHex: item.colorHex) ?? attendanceColor(item.kind)
+    }
+
     private func entryRow(_ item: AttendanceItem) -> some View {
-        let color = Color(librusHex: item.colorHex) ?? attendanceColor(item.kind)
+        let color = itemColor(item)
         return HStack(spacing: Theme.Space.md) {
             Text(item.typeShort)
                 .font(.caption.weight(.bold))

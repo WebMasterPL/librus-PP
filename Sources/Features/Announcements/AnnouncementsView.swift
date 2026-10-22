@@ -90,7 +90,7 @@ struct AnnouncementDetailView: View {
 
                 Divider().padding(.vertical, Theme.Space.xs)
 
-                Text(item.content.isEmpty ? "(brak treści)" : item.content)
+                Text(item.content.isEmpty ? AttributedString("(brak treści)") : LinkedText.attributed(item.content))
                     .font(.body)
                     .textSelection(.enabled)
             }

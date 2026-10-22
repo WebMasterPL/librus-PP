@@ -50,11 +50,27 @@ final class GradeMathTests: XCTestCase {
         XCTAssertEqual(GradeMath.weightedAverage([makeGrade(value: 5, weight: 1), point]), 5)
     }
 
-    /// `colorValue` rescales a point grade onto the same 1-6 gradient the rest
-    /// of the UI colours by, instead of treating "9" as an off-the-charts "6".
-    func testPointGradeColorValueRescaledTo1Through6() {
-        XCTAssertEqual(makePointGrade(value: 9, max: 10, weight: 4).colorValue, 5.5)
-        XCTAssertEqual(makePointGrade(value: 10, max: 10, weight: 4).colorValue, 6)
+    /// `colorValue` turns a point grade into the grade its percentage earns,
+    /// instead of treating "9" as an off-the-charts "6".
+    func testPointGradeColorValueFollowsPercentScale() {
+        XCTAssertEqual(makePointGrade(value: 9, max: 10, weight: 4).colorValue, 4.5)   // 90% db+
+        XCTAssertEqual(makePointGrade(value: 10, max: 10, weight: 4).colorValue, 5)    // bdb
+        XCTAssertEqual(makePointGrade(value: 7, max: 20, weight: 1).colorValue, 2)     // 35% dop
+        XCTAssertEqual(makePointGrade(value: 3, max: 10, weight: 1).colorValue, 1)     // ndst
+    }
+
+    func testPercentScaleThresholds() {
+        let cases: [(Double, Double)] = [
+            (100, 5), (91, 5), (90, 4.5), (86, 4.5), (85, 4), (75, 4), (74, 3.5), (70, 3.5),
+            (69, 3), (55, 3), (54, 2.5), (50, 2.5), (49, 2), (35, 2), (34, 1), (0, 1),
+        ]
+        for (percent, grade) in cases {
+            XCTAssertEqual(GradeMath.gradeValue(forPercent: percent), grade, "\(percent)%")
+        }
+        // Rounded like the label: 90.6% shows "91%" and colours as bdb.
+        XCTAssertEqual(GradeMath.gradeValue(forPercent: 90.6), 5)
+        XCTAssertEqual(GradeMath.gradeValue(forPercent: 90.4), 4.5)
+        XCTAssertEqual(GradeMath.formatPercent(90.6), "91%")
     }
 
     /// 0 points usually means "not handed in yet": grey (nil), not red.

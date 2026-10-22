@@ -261,5 +261,5 @@ struct GradeDetailView: View {
 
 /// A 0-100 percentage on the 1-6 scale `gradeColor` expects.
 func percentColorValue(_ percent: Double) -> Double {
-    1 + percent / 100 * 5
+    GradeMath.gradeValue(forPercent: percent)
 }

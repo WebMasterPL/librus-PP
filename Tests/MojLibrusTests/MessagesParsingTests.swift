@@ -168,6 +168,28 @@ final class MessagesParsingTests: XCTestCase {
         XCTAssertNotEqual(TimetableView.nameKey("Lewandowski Tomasz"), TimetableView.nameKey("Wójcik Tomasz"))
     }
 
+    /// A link hidden behind a label keeps its address in the plain text.
+    func testInlineLinksKeepTheAddress() {
+        XCTAssertEqual(
+            MessagesClient.inlineLinks(#"Formularz: <a href="https://example.com/form?a=1&amp;b=2" target="_blank">kliknij tutaj</a>."#),
+            "Formularz: kliknij tutaj (https://example.com/form?a=1&b=2).")
+        XCTAssertEqual(MessagesClient.inlineLinks(#"<a href="https://example.com/">example.com</a>"#),
+                       "https://example.com/")
+        XCTAssertEqual(MessagesClient.inlineLinks(#"<A HREF='mailto:sekretariat@example.com'>sekretariat@example.com</A>"#),
+                       "sekretariat@example.com")
+        XCTAssertEqual(MessagesClient.inlineLinks(#"<a href="/wiadomosci/1/5/123/f0">Odpowiedz</a>"#), "Odpowiedz")
+    }
+
+    func testLinkedTextMarksLinks() throws {
+        let text = "Plan na www.example.com/plan, pytania: info@example.com, sala 12."
+        let attributed = LinkedText.attributed(text)
+        let links = attributed.runs.compactMap { run in run.link.map { (String(attributed[run.range].characters), $0) } }
+        XCTAssertEqual(links.map(\.0), ["www.example.com/plan", "info@example.com"])
+        XCTAssertEqual(links.first?.1.host, "www.example.com")
+        XCTAssertEqual(links.last?.1.scheme, "mailto")
+        XCTAssertEqual(String(attributed.characters), text)
+    }
+
     func testRecoversWhenSenderCellIsAHeaderLabel() {
         // Shifted layout: cell[2] parsed out as the literal column header.
         let html = """

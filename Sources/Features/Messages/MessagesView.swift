@@ -155,7 +155,7 @@ struct MessageDetailView: View {
                 if loading {
                     ProgressView().frame(maxWidth: .infinity).padding(.vertical, Theme.Space.xl)
                 } else if let text, !text.isEmpty {
-                    Text(text).font(.body).textSelection(.enabled)
+                    Text(LinkedText.attributed(text)).font(.body).textSelection(.enabled)
                 } else {
                     Text("Nie udało się wczytać treści wiadomości.")
                         .font(.callout).foregroundStyle(.secondary)

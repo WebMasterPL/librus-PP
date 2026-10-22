@@ -812,7 +812,7 @@ actor MessagesClient {
 
     private func cleanup(_ html: String) -> String {
         Self.decodeEntities(
-            html
+            Self.inlineLinks(html)
                 .replacingOccurrences(of: "<![CDATA[", with: "")
                 .replacingOccurrences(of: "]]>", with: "")
                 .replacingOccurrences(of: #"(?i)<br\s*/?>"#, with: "\n", options: .regularExpression)
@@ -822,6 +822,41 @@ actor MessagesClient {
         .replacingOccurrences(of: #"\n{3,}"#, with: "\n\n", options: .regularExpression)
         .replacingOccurrences(of: #"[ \t]+\n"#, with: "\n", options: .regularExpression)
         .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// `<a href="URL">label</a>` -> "label (URL)", or just the address when the
+    /// label already is it, so the link survives tag stripping and
+    /// `LinkedText` can make it tappable. Relative Synergia links keep only
+    /// their label — they need the web session anyway.
+    static func inlineLinks(_ html: String) -> String {
+        guard let re = try? NSRegularExpression(
+            pattern: #"(?is)<a\b[^>]*?\bhref\s*=\s*["']([^"']+)["'][^>]*>(.*?)</a>"#) else { return html }
+        let ns = html as NSString
+        var out = ""
+        var last = 0
+        for m in re.matches(in: html, range: NSRange(location: 0, length: ns.length)) {
+            out += ns.substring(with: NSRange(location: last, length: m.range.location - last))
+            last = m.range.location + m.range.length
+            let href = decodeEntities(ns.substring(with: m.range(at: 1)))
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let label = stripHTML(ns.substring(with: m.range(at: 2)))
+            let isMail = href.lowercased().hasPrefix("mailto:")
+            guard isMail || href.lowercased().hasPrefix("http://") || href.lowercased().hasPrefix("https://") else {
+                out += label
+                continue
+            }
+            let address = isMail
+                ? String(href.dropFirst("mailto:".count).prefix { $0 != "?" })
+                : href
+            let a = address.lowercased(), l = label.lowercased()
+            if l.isEmpty || a.contains(l) || l.contains(a) {
+                out += address
+            } else {
+                out += "\(label) (\(address))"
+            }
+        }
+        out += ns.substring(from: last)
+        return out
     }
 
     /// Decode HTML entities Librus emits — numeric (`&#243;` / `&#xF3;`) plus the

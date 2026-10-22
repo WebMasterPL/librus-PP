@@ -38,14 +38,15 @@ struct GradeItem: Identifiable, Codable, Hashable {
         }
     }
 
-    /// `value` on the 1-6 scale `gradeColor` expects — a `.point` grade is
-    /// rescaled by its own max first so a "9/10" doesn't get miscoloured as an
-    /// off-the-charts "6". 0 points usually means "not handed in yet", so it
-    /// goes grey (nil) rather than alarm-red; it still counts as 0 in averages.
+    /// `value` on the 1-6 scale `gradeColor` expects — a `.point` grade becomes
+    /// the grade its percentage earns (`GradeMath.gradeValue(forPercent:)`), so
+    /// "9/10" colours as db+, not as an off-the-charts "9". 0 points usually
+    /// means "not handed in yet", so it goes grey (nil) rather than alarm-red;
+    /// it still counts as 0 in averages.
     var colorValue: Double? {
         guard kind == .point, let value, let pointMax, pointMax > 0 else { return value }
         guard value > 0 else { return nil }
-        return 1 + (value / pointMax) * 5
+        return GradeMath.gradeValue(forPercent: value * 100 / pointMax)
     }
 }
 
@@ -273,6 +274,25 @@ struct SubjectAttendance: Identifiable, Hashable {
                     ? $0.absencePercent > $1.absencePercent
                     : $0.subject.localizedCaseInsensitiveCompare($1.subject) == .orderedAscending
             }
+    }
+}
+
+/// One school day's attendance, lessons in order — the "Ostatnie dni" panel.
+struct AttendanceDay: Identifiable, Hashable {
+    var id: Date { date }
+    let date: Date
+    let items: [AttendanceItem]
+
+    /// Everything but a plain presence, listed by subject under the day.
+    var notable: [AttendanceItem] { items.filter { $0.kind != .present } }
+
+    /// The newest `limit` days that have entries, newest first.
+    static func recent(_ items: [AttendanceItem], limit: Int) -> [AttendanceDay] {
+        let cal = LibrusDate.calendar
+        let byDay = Dictionary(grouping: items.filter { $0.date != nil }) { cal.startOfDay(for: $0.date!) }
+        return byDay.keys.sorted(by: >).prefix(limit).map { day in
+            AttendanceDay(date: day, items: (byDay[day] ?? []).sorted { ($0.lessonNo ?? 0) < ($1.lessonNo ?? 0) })
+        }
     }
 }
 

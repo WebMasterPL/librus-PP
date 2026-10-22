@@ -21,9 +21,29 @@ final class SubjectAttendanceTests: XCTestCase {
         XCTAssertEqual(rows[1].absencePercent, 0)
     }
 
-    private func make(_ kind: AttendanceKind, _ subject: String?) -> AttendanceItem {
+    /// Newest days first, lessons in order, only non-presences listed.
+    func testRecentDays() throws {
+        let mon = try XCTUnwrap(LibrusDate.fromYMD("2026-10-19"))
+        let tue = try XCTUnwrap(LibrusDate.fromYMD("2026-10-20"))
+        let wed = try XCTUnwrap(LibrusDate.fromYMD("2026-10-21"))
+        let items: [AttendanceItem] = [
+            make(.present, "Fizyka", date: wed, lessonNo: 2),
+            make(.absent, "Matematyka", date: wed, lessonNo: 1),
+            make(.present, "Fizyka", date: tue, lessonNo: 1),
+            make(.belated, "Historia", date: tue, lessonNo: 3),
+            make(.present, "Fizyka", date: mon, lessonNo: 1),
+        ]
+        let days = AttendanceDay.recent(items, limit: 2)
+        XCTAssertEqual(days.map(\.date), [wed, tue])
+        XCTAssertEqual(days[0].items.map(\.lessonNo), [1, 2])
+        XCTAssertEqual(days[0].notable.map(\.subjectName), ["Matematyka"])
+        XCTAssertEqual(days[1].notable.map(\.kind), [.belated])
+    }
+
+    private func make(_ kind: AttendanceKind, _ subject: String?,
+                      date: Date = Date(), lessonNo: Int = 1) -> AttendanceItem {
         AttendanceItem(id: Int.random(in: 1...9_999_999), kind: kind, typeName: kind.label,
-                       typeShort: "", colorHex: nil, date: Date(), lessonNo: 1,
+                       typeShort: "", colorHex: nil, date: date, lessonNo: lessonNo,
                        subjectName: subject, semester: 1)
     }
 }
