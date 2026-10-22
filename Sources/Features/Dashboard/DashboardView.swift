@@ -60,7 +60,7 @@ struct DashboardView: View {
             .padding(Theme.Space.lg)
         }
         .screenBackground()
-        .navigationTitle(repo.studentName.isEmpty ? "Pulpit" : repo.studentName)
+        .navigationTitle(repo.studentName.isEmpty ? "Najnowsze" : repo.studentName)
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {

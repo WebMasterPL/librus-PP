@@ -8,7 +8,7 @@ struct MainTabView: View {
     var body: some View {
         TabView {
             DashboardTab()
-                .tabItem { Label("Pulpit", systemImage: "house.fill") }
+                .tabItem { Label("Najnowsze", systemImage: "newspaper.fill") }
 
             GradesTab()
                 .tabItem { Label("Oceny", systemImage: "checkmark.seal.fill") }

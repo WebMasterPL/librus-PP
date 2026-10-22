@@ -20,7 +20,7 @@ przez **SideStore / AltStore** darmowym Apple ID.
 
 | Ekran | Źródło danych |
 |---|---|
-| Pulpit — bieżąca/następna lekcja, dzisiejszy plan, ostatnie oceny, liczniki | agregacja |
+| Najnowsze — bieżąca/następna lekcja, dzisiejszy plan, ostatnie oceny i nieobecności, liczniki | agregacja |
 | Oceny — wg przedmiotów, średnie ważone, filtr semestru, **kalkulator „co jeśli / ile potrzebuję"** | `api.librus.pl/2.0/Grades` |
 | Plan lekcji — tydzień, zastępstwa, odwołania, **zmiana sali**, skok do „dziś" | `.../2.0/Timetables` + `Classrooms` |
 | Frekwencja — podsumowanie % + wpisy, wg przedmiotów, filtr semestru | `.../2.0/Attendances` |
