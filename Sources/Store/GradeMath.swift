@@ -52,23 +52,38 @@ enum GradeMath {
 
     /// Percentage thresholds for tests from the school statute, best grade
     /// first: each is the lowest whole percent that still earns that grade.
-    static let percentScale: [(minPercent: Double, grade: Double)] = [
-        (91, 5),    // bdb  91-100%
-        (86, 4.5),  // db+  86-90%
-        (75, 4),    // db   75-85%
-        (70, 3.5),  // dst+ 70-74%
-        (55, 3),    // dst  55-69%
-        (50, 2.5),  // dop+ 50-54%
-        (35, 2),    // dop  35-49%
-        (0, 1),     // ndst 0-34%
+    static let percentScale: [(minPercent: Double, grade: Double, label: String)] = [
+        (91, 5, "bdb"),     // 91-100%
+        (86, 4.5, "db+"),   // 86-90%
+        (75, 4, "db"),      // 75-85%
+        (70, 3.5, "dst+"),  // 70-74%
+        (55, 3, "dst"),     // 55-69%
+        (50, 2.5, "dop+"),  // 50-54%
+        (35, 2, "dop"),     // 35-49%
+        (0, 1, "ndst"),     // 0-34%
     ]
 
     /// The grade (1-6 scale) a percentage earns. Rounded to a whole percent
     /// first, the same way `formatPercent` shows it, so "91%" never colours
     /// as db+.
     static func gradeValue(forPercent percent: Double) -> Double {
+        percentStep(percent).grade
+    }
+
+    /// The school's short name for that grade ("db+").
+    static func gradeLabel(forPercent percent: Double) -> String {
+        percentStep(percent).label
+    }
+
+    /// "90% · db+"
+    static func formatPercentWithGrade(_ percent: Double) -> String {
+        "\(formatPercent(percent)) · \(gradeLabel(forPercent: percent))"
+    }
+
+    private static func percentStep(_ percent: Double) -> (grade: Double, label: String) {
         let p = percent.rounded()
-        return percentScale.first { p >= $0.minPercent }?.grade ?? 1
+        let step = percentScale.first { p >= $0.minPercent } ?? percentScale[percentScale.count - 1]
+        return (step.grade, step.label)
     }
 
     static func formatPercent(_ value: Double) -> String {

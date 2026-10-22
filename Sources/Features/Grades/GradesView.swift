@@ -73,7 +73,7 @@ struct GradesView: View {
                         Text("Średnia punktowa")
                             .font(.subheadline)
                         Spacer()
-                        Text(GradeMath.formatPercent(pct))
+                        Text(GradeMath.formatPercentWithGrade(pct))
                             .font(.title3.weight(.bold))
                             .fontDesign(.rounded)
                             .foregroundStyle(gradeColor(for: percentColorValue(pct)))
@@ -121,7 +121,7 @@ struct GradesView: View {
                                 .foregroundStyle(gradeColor(for: avg))
                         }
                         if let pct = subject.pointPercent(filter, current: current) {
-                            Text(GradeMath.formatPercent(pct))
+                            Text(GradeMath.formatPercentWithGrade(pct))
                                 .fontDesign(.rounded)
                                 .foregroundStyle(gradeColor(for: percentColorValue(pct)))
                         }
@@ -234,7 +234,7 @@ struct GradeDetailView: View {
                         : GradeMath.format(value))
                 }
                 if let value = grade.value, let max = grade.pointMax, max > 0 {
-                    KeyValueRow(key: "Procent", value: GradeMath.formatPercent(value / max * 100))
+                    KeyValueRow(key: "Procent", value: GradeMath.formatPercentWithGrade(value * 100 / max))
                 }
                 if grade.weight > 0 { KeyValueRow(key: "Waga", value: GradeMath.format(grade.weight)) }
                 KeyValueRow(key: "Liczona do średniej", value: grade.countsToAverage ? "Tak" : "Nie")

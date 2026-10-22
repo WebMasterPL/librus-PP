@@ -73,6 +73,18 @@ final class GradeMathTests: XCTestCase {
         XCTAssertEqual(GradeMath.formatPercent(90.6), "91%")
     }
 
+    func testPercentGradeLabels() {
+        let cases: [(Double, String)] = [
+            (100, "bdb"), (91, "bdb"), (90, "db+"), (86, "db+"), (85, "db"), (75, "db"),
+            (74, "dst+"), (70, "dst+"), (69, "dst"), (55, "dst"), (54, "dop+"), (50, "dop+"),
+            (49, "dop"), (35, "dop"), (34, "ndst"), (0, "ndst"),
+        ]
+        for (percent, label) in cases {
+            XCTAssertEqual(GradeMath.gradeLabel(forPercent: percent), label, "\(percent)%")
+        }
+        XCTAssertEqual(GradeMath.formatPercentWithGrade(87.2), "87% · db+")
+    }
+
     /// 0 points usually means "not handed in yet": grey (nil), not red.
     func testZeroPointGradeIsGrey() {
         XCTAssertNil(makePointGrade(value: 0, max: 10, weight: 1).colorValue)
